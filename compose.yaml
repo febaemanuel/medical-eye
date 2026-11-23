@@ -1,7 +1,9 @@
 services:
   web:
+    image: medical-eye-web
     build: .
     restart: unless-stopped
+    depends_on: [willie, references]
     ports:
       - "127.0.0.1:${PORT:-4310}:4310"
     environment:
@@ -10,9 +12,23 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       VISION_MODEL: ${VISION_MODEL:-gemini-3.8-flash}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-}
+      WILLIE_URL: http://willie:8765
+      WILLIE_TOKEN: ${WILLIE_TOKEN:-}
+      REFERENCES_DIR: /references
+    volumes:
+      - ./references:/references:ro
+
+  references:
+    image: medical-eye-web
+    build: .
+    user: root
+    environment:
+      NODE_USE_ENV_PROXY: "1"
+    command: ["node", "scripts/download-references.mjs", "/references"]
+    volumes:
+      - ./references:/references
 
   willie:
-    profiles: [research]
     build: ./willie
     restart: unless-stopped
     environment:

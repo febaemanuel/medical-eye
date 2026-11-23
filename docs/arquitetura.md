@@ -2,34 +2,32 @@
 
 ```mermaid
 flowchart TD
-    A[Foto na PWA] --> B[JPEG sem metadados originais]
-    B --> C[Uma chamada ao Gemini]
-    C --> D[Tipo sugerido e achados visuais]
-    D --> E[Perguntas de consulta e exame]
-    E <--> F[Orientações da base local]
-    E --> G[Resumo no servidor local]
+    A[Foto na PWA] --> B[JPEG]
+    B --> C[WILLIE MINI local]
+    B -->|Envio autorizado| D[Uma chamada ao Gemini]
+    C --> E[Tipo e contorno estimados]
+    D --> F[Achados visuais]
+    E --> G[Roteiro de consulta e exame]
     F --> G
-    G --> H[Achados registrados, pendências e fontes]
+    G <-->|Seção, síntese e PDF| H[Biblioteca local]
+    G --> I[Resumo, pendências, conduta e tratamento]
+    H --> I
 ```
 
-## Análise da foto
+## Foto
 
-A PWA converte a foto para JPEG de até 1.536 pixels por lado e a envia ao servidor após confirmação de autorização. O servidor faz um pedido ao Gemini com um esquema JSON. O modelo devolve o tipo sugerido, a qualidade da imagem e os achados visuais. As classes são `diabetic`, `pressure`, `surgical`, `venous` e `no_wound`. Uma imagem inconclusiva pode voltar com tipo indeterminado e abrir o roteiro geral. Ao voltar à foto na mesma ficha, a PWA reutiliza os achados em memória.
+O WILLIE usa um checkpoint oficial do MINI com os decodificadores de classificação e segmentação. A estimativa de contorno usa a máscara do modelo e pode ser ocultada na tela. As classes são `diabetic`, `pressure`, `surgical`, `venous` e `no_wound`. O Gemini recebe um esquema JSON para achados visuais, qualidade e descrição da foto. Uma falha em um provedor deixa os resultados do outro acessíveis.
 
-## Consulta e exame
+## Exame e resumo
 
-O formulário começa com perguntas comuns de história, como presença de diabetes, febre e sinais de piora. A sugestão da foto seleciona as perguntas específicas. O contexto indicado pelo profissional passa a orientar esse roteiro assim que é registrado. Os achados visuais dão prioridade a perguntas do exame, como extensão da vermelhidão ou secreção. A confirmação clínica permite registrar alterações de pele mesmo quando a foto retorna sem ferida visível.
+O profissional pode corrigir a etiologia e mudar o roteiro. Os achados visuais abrem ou priorizam perguntas, como extensão do eritema ou presença de secreção purulenta. Cada sugestão visual tem revisão própria. Os campos clínicos registram as informações usadas para a hipótese, o estadiamento quando aplicável, a avaliação de infecção e a seleção dos tópicos de tratamento.
 
-## Orientações e resumo
+O servidor seleciona as orientações e evidências a partir do contexto registrado, com vínculo por assunto e com busca textual para as fontes complementares. O resumo indica os dados que ainda faltam para decidir opções como descarga de pressão ou compressão. As recomendações e as sínteses são vinculadas à publicação, como apoio à avaliação e à discussão com a equipe.
 
-A orientação de cada pergunta é buscada pelo identificador do campo e pelo contexto vigente. O navegador dá preferência à referência específica e usa uma referência geral quando apropriado. As orientações são sínteses com a seção e um link para o texto integral.
+## Biblioteca
 
-O servidor consulta a mesma base e monta o resumo das respostas confirmadas, pendências, hipóteses e referências. O contexto, os tecidos e a profundidade registrados orientam o estágio da lesão por pressão. A escala IWGDF/IDSA exige confirmação de que a lesão está no pé de uma pessoa com diabetes e dos critérios clínicos necessários. Em caso de dados insuficientes, o resumo mantém a incerteza e mostra a fonte relacionada à pendência.
+`web/data/protocolos.mjs` reúne os trechos de avaliação. `web/data/treatment.mjs` reúne as sínteses de tratamento e estudos. Em `guidance`, use o identificador da pergunta para vincular a orientação. Para cadastrar um PDF local, indique `document` e, quando útil, `page` no registro. O mapa `web/data/documents.mjs` contém as origens dos PDFs baixados pelo script.
 
-## Manter a base
+A biblioteca permite busca nos títulos, nas sínteses e nos termos indexados. O PDF abre no visualizador do navegador. Os arquivos integrais são baixados das origens para a instalação local, e cada entrada preserva o link original. As sínteses em português podem ser revisadas e complementadas com o protocolo do serviço.
 
-Edite `web/data/protocolos.mjs` para incluir novas sínteses ou protocolos locais revisados. Use identificadores estáveis e links HTTPS. Em `guidance`, a chave é o identificador da pergunta e o valor é a orientação correspondente. A função `retrieve` procura termos na base para o resumo e `guidanceFor` faz a consulta específica na ficha.
-
-Atualize a versão do cache em `web/sw.js` e use o mesmo número na URL dos arquivos de interface em `web/index.html` e no shell do service worker quando alterar o frontend. As URLs versionadas permitem atualizar a ficha instalada e carregar o esquema correspondente ao servidor.
-
-Fontes iniciais. [Anvisa, lesão por pressão](https://www.gov.br/anvisa/pt-br/centraisdeconteudo/publicacoes/servicosdesaude/notas-tecnicas/notas-tecnicas-vigentes/nota-tecnica-gvims-ggtes-anvisa-no-05-2023-praticas-de-seguranca-do-paciente-em-servicos-de-saude-prevencao-de-lesao-por-pressao/) · [IWGDF/IDSA, infecção do pé relacionada ao diabetes](https://doi.org/10.1093/cid/ciad527) · [NICE NG125, sítio cirúrgico](https://www.nice.org.uk/guidance/ng125/chapter/recommendations) · [NICE NG152, úlcera de perna](https://www.nice.org.uk/guidance/ng152/chapter/recommendations)
+A PWA armazena em cache a interface e o catálogo. A foto, o exame e as respostas da API ficam fora do cache. Ao alterar o frontend, atualize as URLs de recursos em `web/index.html` e a versão correspondente em `web/sw.js`.

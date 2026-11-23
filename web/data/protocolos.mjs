@@ -1,3 +1,5 @@
+import { TREATMENT_SOURCES } from './treatment.mjs';
+
 const anvisa = 'https://www.gov.br/anvisa/pt-br/centraisdeconteudo/publicacoes/servicosdesaude/notas-tecnicas/notas-tecnicas-vigentes/nota-tecnica-gvims-ggtes-anvisa-no-05-2023-praticas-de-seguranca-do-paciente-em-servicos-de-saude-prevencao-de-lesao-por-pressao/';
 const iwgdf = 'https://doi.org/10.1093/cid/ciad527';
 const niceLeg = 'https://www.nice.org.uk/guidance/ng152/chapter/recommendations';
@@ -8,6 +10,7 @@ const cofen = 'https://www.cofen.gov.br/wp-content/uploads/2025/08/Resolucao-Cof
 export const PROTOCOLS = [
   {
     id: 'iwgdf-exame', type: 'diabetic', organization: 'IWGDF / IDSA', year: 2023,
+    document: 'iwgdf-infection', page: 13,
     title: 'Infecção do pé relacionada ao diabetes', section: 'Recomendação 1 e tabela 1', url: iwgdf,
     text: 'A avaliação de infecção do pé em pessoas com diabetes usa achados clínicos. A tabela 1 considera secreção purulenta, calor, dor, edema ou induração e extensão do eritema. Também orienta a considerar causas alternativas de inflamação e a avaliar o envolvimento profundo e a resposta sistêmica.',
     tags: ['secreção', 'vermelhidão', 'profundidade', 'SIRS', 'diabetes'],
@@ -23,6 +26,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'iwgdf-urgencia', type: 'diabetic', organization: 'IWGDF / IDSA', year: 2023,
+    document: 'iwgdf-infection', page: 30,
     title: 'Infecção do pé relacionada ao diabetes', section: 'Recomendações 2 e 18, tabela 2', url: iwgdf,
     text: 'A diretriz recomenda avaliação cirúrgica urgente para infecção grave ou infecção moderada com complicações como gangrena extensa, sinais de abscesso profundo, infecção necrosante ou isquemia grave. A necessidade de hospitalização depende da gravidade e das comorbidades relevantes.',
     tags: ['sistêmico', 'urgência', 'piora', 'profundidade', 'necrose'],
@@ -32,6 +36,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'anvisa-estagios', type: 'pressure', organization: 'Anvisa', year: 2023,
+    document: 'anvisa-pressure', page: 7,
     title: 'Prevenção de lesão por pressão', section: 'Nota técnica 05/2023, seção 1.1, p. 7–8', url: anvisa,
     text: 'O estadiamento pressupõe uma lesão por pressão identificada na avaliação clínica. Examina-se a integridade da pele, quais tecidos estão expostos, a presença de escara ou esfacelo que encobre a perda tissular e os sinais de dano tissular profundo.',
     tags: ['derme', 'tecido', 'estágio', 'pressão', 'profundidade'],
@@ -43,6 +48,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'anvisa-prevencao', type: 'pressure', organization: 'Anvisa', year: 2023,
+    document: 'anvisa-pressure',
     title: 'Prevenção de lesão por pressão', section: 'Nota técnica 05/2023, definição e prevenção', url: anvisa,
     text: 'Lesões por pressão envolvem pressão prolongada ou intensa, isolada ou combinada com cisalhamento. A prevenção inclui inspeção da pele, avaliação de risco, superfícies de suporte e reposicionamento individualizado.',
     tags: ['pressão', 'cisalhamento', 'reposicionamento', 'pele'],
@@ -52,6 +58,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'nice-incisao', type: 'surgical', organization: 'NICE', year: 2019,
+    document: 'nice-surgery', page: 22,
     title: 'Infecção de sítio cirúrgico', section: 'NG125, seção 1.4 e definições', url: niceSurgical,
     text: 'A infecção de sítio cirúrgico pode apresentar calor, eritema, dor e edema ao redor da incisão, com manifestações sistêmicas em casos mais graves. A avaliação deve considerar profundidade, contexto pós-operatório e os achados ao redor da ferida.',
     tags: ['incisão', 'cirurgia', 'secreção', 'calor', 'sistêmico'],
@@ -62,6 +69,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'nice-ulcera', type: 'venous', organization: 'NICE', year: 2020,
+    document: 'nice-leg',
     title: 'Infecção de úlcera de perna', section: 'NG152, itens 1.1.1–1.1.3', url: niceLeg,
     text: 'A avaliação de infecção de úlcera da perna considera sinais como eritema ou edema além da borda, calor localizado, dor crescente ou febre. A avaliação também precisa considerar as condições de base, como insuficiência venosa e edema.',
     tags: ['venosa', 'eritema', 'edema', 'calor', 'úlcera'],
@@ -74,6 +82,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'nice-ulcera-urgencia', type: 'venous', organization: 'NICE', year: 2020,
+    document: 'nice-leg',
     title: 'Infecção de úlcera de perna', section: 'NG152, itens 1.1.8–1.1.13', url: niceLeg,
     text: 'Reavalie em caso de piora rápida, comprometimento sistêmico ou dor intensa desproporcional. Suspeita de sepse, fasciíte necrosante ou osteomielite é motivo de avaliação hospitalar.',
     tags: ['venosa', 'urgência', 'piora', 'sistêmico', 'dor'],
@@ -83,10 +92,12 @@ export const PROTOCOLS = [
   },
   {
     id: 'cofen-registro', type: 'general', organization: 'Cofen', year: 2025,
+    document: 'cofen-787', page: 3,
     title: 'Atuação da enfermagem no cuidado às pessoas com lesões cutâneas', section: 'Resolução 787/2025, anexo, capítulo I', url: cofen,
     text: 'O registro da avaliação de uma lesão inclui etiologia, tipo de tecido, achados relacionados à infecção ou inflamação, exsudato, bordas e condição da pele ao redor.',
     tags: ['história', 'avaliação', 'tecido', 'exsudato', 'bordas', 'pele'],
     guidance: {
+      duration: 'Registre quando a lesão foi percebida e a evolução desde então.',
       wound: 'Inspecione a região e a pele ao redor e registre se há alteração objetiva no exame.',
       etiology: 'Use a história e os achados clínicos para registrar a provável causa da lesão quando houver dados suficientes.',
       diabetes: 'Verifique a história clínica e o prontuário disponíveis e registre se o diagnóstico de diabetes foi informado ou documentado.',
@@ -97,6 +108,7 @@ export const PROTOCOLS = [
   },
   {
     id: 'nice-sinais', type: 'general', organization: 'NICE', year: 2025,
+    document: 'nice-sepsis',
     title: 'Suspeita de sepse em pessoas com 16 anos ou mais', section: 'NG253, avaliação de risco', url: niceSepsis,
     text: 'A avaliação de risco considera história, evolução, sinais vitais, alterações do estado mental e possíveis focos de infecção. Alterações no sítio cirúrgico incluem vermelhidão, edema, secreção ou abertura da ferida.',
     tags: ['febre', 'sistêmico', 'piora', 'urgência', 'sinais', 'temperatura'],
@@ -118,4 +130,5 @@ export const PROTOCOLS = [
       swelling: 'Observe se há edema ao redor da região e se ele se estende além da área inicialmente afetada.',
     },
   },
+  ...TREATMENT_SOURCES,
 ];

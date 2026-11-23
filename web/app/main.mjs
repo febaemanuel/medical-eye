@@ -1,11 +1,12 @@
 import { TYPES, questionsFor } from './domain.mjs';
 import { icon, svg } from './icons.mjs';
-import { renderView, urgencyNotice } from './views.mjs';
+import { renderView, renderLibraryResults, urgencyNotice } from './views.mjs';
 
 const el = id => document.getElementById(id);
 const state = {
   page: 'assessment', step: 0, maxStep: 0, photo: null, photoUrl: null, authorized: false,
-  config: null, configError: false, type: null, vision: null, exam: {}, report: null,
+  cloudAuthorized: false, config: null, configError: false, type: null, vision: null, exam: {}, report: null,
+  analyzed: false, maskUrl: null, visualReview: {}, willieError: null, visionError: null,
   pending: '', error: '', install: null, camera: null,
 };
 
@@ -14,7 +15,7 @@ function announce(message) {
 }
 
 function updateExamStatus() {
-  const questions = questionsFor(state.type, state.vision.findings, state.exam);
+  const questions = questionsFor(state.type, state.vision?.findings ?? [], state.exam);
   const answered = questions.filter(({ id }) => Object.hasOwn(state.exam, id)).length;
   el('completion').textContent = answered + ' de ' + questions.length + ' perguntas respondidas';
   el('generate').disabled = answered !== questions.length || Boolean(state.pending);
@@ -78,7 +79,11 @@ async function jpeg(file) {
 
 function clearPhoto() {
   if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
-  Object.assign(state, { photo: null, photoUrl: null, type: null, vision: null, exam: {}, report: null, maxStep: 0 });
+  if (state.maskUrl) URL.revokeObjectURL(state.maskUrl);
+  Object.assign(state, {
+    photo: null, photoUrl: null, type: null, vision: null, maskUrl: null, analyzed: false,
+    willieError: null, visionError: null, visualReview: {}, exam: {}, report: null, maxStep: 0,
+  });
 }
 
 async function choosePhoto(file) {
@@ -98,12 +103,12 @@ async function choosePhoto(file) {
     state.pending = '';
     render();
   }
-  if (!state.error && state.authorized && state.config?.configured) await analyze();
+  if (!state.error && state.authorized && state.config) await analyze();
 }
 
 async function analyze() {
-  if (!state.photo || !state.authorized || !state.config?.configured || state.pending) return;
-  if (state.vision) {
+  if (!state.photo || !state.authorized || state.pending) return;
+  if (state.analyzed) {
     goTo(1);
     return;
   }
@@ -113,10 +118,19 @@ async function analyze() {
   announce('Analisando a foto.');
   try {
     const result = await fetchJson('/api/analyze', {
-      method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Image-Authorized': 'yes' }, body: state.photo,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'image/jpeg', 'X-Image-Authorized': 'yes',
+        'X-Gemini-Authorized': state.cloudAuthorized ? 'yes' : 'no',
+      },
+      body: state.photo,
     });
-    if ((result.type !== null && !Object.hasOwn(TYPES, result.type)) || !result.vision) throw new Error('A análise retornou dados incompletos.');
-    Object.assign(state, { ...result, exam: {}, report: null, maxStep: 1, pending: '' });
+    if (result.type !== null && !Object.hasOwn(TYPES, result.type)) throw new Error('A análise retornou dados incompletos.');
+    const { type, vision, mask, willieError, visionError } = result;
+    const maskUrl = mask
+      ? URL.createObjectURL(new Blob([Uint8Array.from(atob(mask), char => char.charCodeAt(0))], { type: 'image/png' }))
+      : null;
+    Object.assign(state, { type, vision, maskUrl, willieError, visionError, analyzed: true, maxStep: 1, pending: '' });
     goTo(1);
     announce('Análise concluída. Revise os achados.');
   } catch (error) {
@@ -135,7 +149,7 @@ async function generate() {
   try {
     state.report = await fetchJson('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ authorized: state.authorized, type: state.type, vision: state.vision, exam: state.exam }),
+      body: JSON.stringify({ authorized: state.authorized, type: state.type, vision: state.vision, visualReview: state.visualReview, exam: state.exam }),
     });
     state.pending = '';
     goTo(3);
@@ -237,6 +251,7 @@ document.addEventListener('click', event => {
     case 'reset':
       clearPhoto();
       state.authorized = false;
+      state.cloudAuthorized = false;
       goTo(0);
       break;
   }
@@ -247,18 +262,14 @@ document.addEventListener('change', event => {
   if (['camera-file', 'gallery-file'].includes(input.id)) void choosePhoto(input.files[0]);
   if (input.id === 'consent') {
     state.authorized = input.checked;
-    if (!state.authorized && state.vision) {
-      state.type = null;
-      state.vision = null;
-      state.exam = {};
-      state.report = null;
-      state.maxStep = 0;
-      render();
-      el('consent').focus({ preventScroll: true });
-    }
-    el('app').querySelector('[data-action=analyze]').disabled =
-      !state.authorized || !state.photo || !state.config?.configured || Boolean(state.pending);
-    if (state.authorized && state.photo) void analyze();
+    el('app').querySelector('[data-action=analyze]').disabled = !state.authorized || !state.photo || Boolean(state.pending);
+  }
+  if (input.id === 'cloud-consent') state.cloudAuthorized = input.checked;
+  if (input.id === 'mask-toggle') el('wound-mask').hidden = !input.checked;
+  if (input.dataset.visual && input.type === 'radio') {
+    state.visualReview[input.dataset.visual] = input.value;
+    state.report = null;
+    state.maxStep = Math.min(state.maxStep, 2);
   }
   if (input.form?.id === 'exam-form' && input.type === 'radio') {
     const hasPriorReport = Boolean(state.report);
@@ -279,6 +290,12 @@ document.addEventListener('change', event => {
       const guidance = selected?.closest('fieldset')?.querySelector('.question-help');
       if (guidance) guidance.open = true;
     }
+  }
+});
+
+document.addEventListener('input', event => {
+  if (event.target.id === 'reference-search') {
+    el('reference-results').innerHTML = renderLibraryResults(event.target.value);
   }
 });
 
@@ -317,7 +334,6 @@ render();
 fetchJson('/api/config').then(config => {
   state.config = config;
   render();
-  if (state.authorized && state.photo && config.configured) void analyze();
 }).catch(() => {
   state.configError = true;
   render();

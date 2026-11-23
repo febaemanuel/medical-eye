@@ -1,11 +1,13 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname } from 'node:path';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { handleApi } from './api.mjs';
+import { DOCUMENTS } from '../web/data/documents.mjs';
 
 const webRoot = fileURLToPath(new URL('../web/', import.meta.url));
+const defaultReferences = fileURLToPath(new URL('../references/', import.meta.url));
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -53,6 +55,22 @@ export function createAppServer(config = process.env) {
       }
       if (!['GET', 'HEAD'].includes(request.method)) {
         response.writeHead(405).end();
+        return;
+      }
+      const document = url.pathname.match(/^\/referencias\/([a-z0-9-]+)\.pdf$/)?.[1];
+      if (document && Object.hasOwn(DOCUMENTS, document)) {
+        const pdf = await readFile(join(config.REFERENCES_DIR || defaultReferences, document + '.pdf')).catch(error => {
+          if (error.code !== 'ENOENT') throw error;
+          return null;
+        });
+        if (!pdf) {
+          response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+          response.end(request.method === 'HEAD' ? undefined : 'PDF local indisponível. Volte à ficha e abra a fonte original ou baixe a biblioteca.');
+          return;
+        }
+        response.removeHeader('Content-Security-Policy');
+        response.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': pdf.length, 'Cache-Control': 'no-cache' });
+        response.end(request.method === 'HEAD' ? undefined : pdf);
         return;
       }
       const path = url.pathname === '/' ? '/index.html' : url.pathname.replace(/^\/assets\/\d+(?=\/)/, '');

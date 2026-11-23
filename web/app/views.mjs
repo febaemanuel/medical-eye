@@ -1,6 +1,7 @@
-import { TYPES, VISUAL, questionsFor, urgent } from './domain.mjs';
+import { TYPES, VISUAL, VISUAL_REVIEW, questionsFor, urgent } from './domain.mjs';
 import { guidanceFor } from './evidence.mjs';
 import { PROTOCOLS } from '../data/protocolos.mjs';
+import { pdfLink } from '../data/documents.mjs';
 import { icon, svg } from './icons.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, mark => ({
@@ -37,19 +38,17 @@ function stepper(state) {
         return `<li ${current ? 'aria-current="step"' : ''}>${item}</li>`;
       }).join('')}
     </ol>
-    ${state.vision ? `<div class="case-label"><small>Tipo sugerido na foto</small><strong>${esc(suggestedType(state.type))}</strong></div>` : ''}
+    ${state.analyzed ? `<div class="case-label"><small>Sugestão do WILLIE</small><strong>${esc(suggestedType(state.type))}</strong></div>` : ''}
   </aside>`;
 }
 
 function imageScreen(state) {
   const busy = state.pending === 'image';
   const disabled = busy ? 'disabled' : '';
-  const ready = state.config?.configured && state.photo && state.authorized && !busy;
+  const ready = state.photo && state.authorized && !busy;
   let serviceNotice = '';
   if (state.configError) {
     serviceNotice = notice('Servidor indisponível. Verifique a conexão e tente novamente.', 'warning');
-  } else if (state.config && !state.config.configured) {
-    serviceNotice = notice('Configure a chave Gemini no servidor para analisar a foto.', 'warning');
   }
 
   return `${heading('Foto da ferida', 'Tire uma foto ou selecione uma imagem da galeria.')}
@@ -84,31 +83,52 @@ function imageScreen(state) {
     </div>
     ${serviceNotice}
     <label class="consent"><input type="checkbox" id="consent" ${state.authorized ? 'checked' : ''} ${disabled}>
-      <span>Confirmo que a foto pode ser enviada ao Gemini para análise.</span></label>
+      <span>Confirmo que a foto pode ser processada pelo Medical Eye.</span></label>
+    ${state.config?.geminiConfigured ? `<label class="consent cloud-consent">
+      <input type="checkbox" id="cloud-consent" ${state.cloudAuthorized ? 'checked' : ''} ${disabled || (state.analyzed ? 'disabled' : '')}>
+      <span>O serviço autoriza enviar esta foto ao Gemini para sugerir achados visuais.</span></label>`
+      : '<p class="cloud-consent quiet">WILLIE local disponível quando o serviço estiver pronto. Para sugestões do Gemini, configure a chave no servidor.</p>'}
     ${state.error ? notice(state.error, 'danger') : ''}
     <footer class="sheet-actions">
       <p class="quiet">${icon('lock')} A ficha fica disponível durante a sessão.</p>
       <button class="btn primary" type="button" data-action="analyze" ${ready ? '' : 'disabled'}>
-        ${busy ? 'Analisando foto…' : state.vision ? 'Ver achados' : 'Analisar foto'}</button>
+        ${busy ? 'Analisando foto…' : state.analyzed ? 'Ver achados' : 'Analisar foto'}</button>
     </footer>`;
 }
 
 function findingsScreen(state) {
   const { vision } = state;
-  return `${heading('Achados da foto', 'Confira a leitura da imagem antes de registrar o exame.')}
+  return `${heading('Achados da foto', 'Revise a sugestão do WILLIE e confira na lesão os achados da imagem.')}
     <div class="finding-layout">
-      <img class="finding-photo" src="${esc(state.photoUrl)}" alt="Foto da ferida analisada">
+      <div>
+        <div class="photo-layer">
+          <img class="finding-photo" src="${esc(state.photoUrl)}" alt="Foto selecionada da ferida">
+          ${state.maskUrl ? `<img class="wound-mask" id="wound-mask" src="${esc(state.maskUrl)}" alt="Contorno estimado pelo WILLIE">` : ''}
+        </div>
+        ${state.maskUrl ? '<label class="consent mask-toggle"><input id="mask-toggle" type="checkbox" checked> Exibir contorno estimado</label>' : ''}
+      </div>
       <div class="finding-notes">
         <div class="finding-facts">
-          <div><span>Tipo sugerido pelo Gemini</span><strong>${esc(suggestedType(state.type))}</strong></div>
-          <div><span>Qualidade da imagem</span><strong>${esc(quality[vision.quality])}</strong></div>
+          <div><span>Tipo sugerido pelo WILLIE</span><strong>${esc(suggestedType(state.type))}</strong></div>
+          ${vision ? `<div><span>Qualidade da imagem</span><strong>${esc(quality[vision.quality])}</strong></div>` : ''}
         </div>
-        <p>${esc(vision.description)}</p>
-        ${vision.findings.length ? `<ul>${vision.findings.map(item => `<li>${esc(VISUAL[item])}</li>`).join('')}</ul>` : ''}
+        ${vision ? `<p class="image-cue">Descrição do Gemini</p><p>${esc(vision.description)}</p>` : ''}
+        ${!state.maskUrl && !state.willieError ? '<p class="quiet">Sem contorno identificado nesta foto.</p>' : ''}
       </div>
     </div>
-    ${vision.quality === 'poor' ? notice('Considere tirar outra foto. Registre no exame o que puder avaliar.', 'warning') : ''}
-    ${state.type === 'no_wound' ? notice('A foto não mostra uma ferida visível. Verifique no exame se há alguma alteração de pele.') : ''}
+    ${state.willieError ? notice(state.willieError, 'warning') : ''}
+    ${state.visionError ? notice(state.visionError + ' Você pode seguir com o exame.', 'warning') : ''}
+    ${vision?.quality === 'poor' ? notice('Considere tirar outra foto. A leitura do WILLIE também deve ser revisada.', 'warning') : ''}
+    ${state.type === 'no_wound' ? notice('O WILLIE marcou imagem sem ferida visível. Confira a pele no exame.') : ''}
+    ${vision?.findings.length ? `<section class="visual-checklist" aria-label="Revisar achados sugeridos">
+      <h3>Achados sugeridos pelo Gemini</h3>
+      ${vision.findings.map(id => `<fieldset class="question">
+        <legend>${esc(VISUAL[id])}</legend>
+        <div class="options">${Object.entries(VISUAL_REVIEW).map(([value, label]) => `
+          <label><input type="radio" data-visual="${id}" name="visual-${id}" value="${value}"
+            ${state.visualReview[id] === value ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}</div>
+      </fieldset>`).join('')}
+    </section>` : ''}
     <footer class="sheet-actions"><button class="btn" data-step="0">Voltar à foto</button>
       <button class="btn primary" data-action="exam">Abrir exame</button></footer>`;
 }
@@ -124,7 +144,7 @@ function questionField(question, state) {
   const guidance = guidanceFor(id, state.type, state.exam);
   const selected = state.exam[id];
   return `<fieldset class="question"><legend>${esc(label)}</legend>
-    ${fromImage ? '<p class="image-cue">Orientada pela leitura da foto</p>' : ''}
+    ${fromImage ? '<p class="image-cue">Pergunta aberta por um achado da foto</p>' : ''}
     ${hint ? `<p class="hint">${esc(hint)}</p>` : ''}
     <div class="options">${options.map(([value, title]) => `
       <label><input type="radio" name="${id}" value="${value}" ${selected === value ? 'checked' : ''} ${state.pending ? 'disabled' : ''}>
@@ -133,16 +153,15 @@ function questionField(question, state) {
       <summary>${icon('book')} Consultar orientação</summary>
       <div class="help-text">
         <p>${esc(guidance.text)}</p>
-        <a href="${esc(guidance.reference.url)}" target="_blank" rel="noopener noreferrer">
-          ${esc(guidance.reference.organization)} · ${esc(guidance.reference.section)}
-        </a>
+        <small>${esc(guidance.reference.organization)} · ${esc(guidance.reference.section)}</small>
+        ${sourceLinks(guidance.reference)}
       </div>
     </details>` : ''}
   </fieldset>`;
 }
 
 function examScreen(state) {
-  const questions = questionsFor(state.type, state.vision.findings, state.exam);
+  const questions = questionsFor(state.type, state.vision?.findings ?? [], state.exam);
   const groups = [
     ['consultation', 'Consulta e histórico'],
     ['examination', 'Exame da lesão'],
@@ -176,21 +195,43 @@ function sectionReport(label, section, references) {
     ${citationLinks(section.refs, references)}</section>`;
 }
 
-function sourceCard(ref) {
-  return `<article class="source" id="source-${esc(ref.id)}">
-      <small>${esc(ref.organization)} · ${esc(ref.year)}</small><h3>${esc(ref.title)}</h3>
+function sourceLinks(ref) {
+  const pdf = pdfLink(ref);
+  return `<div class="source-links">
+    ${pdf ? `<a href="${esc(pdf)}" target="_blank" rel="noopener noreferrer">Abrir PDF local${ref.document === 'nice-leg' ? ' (resumo)' : ''}</a>` : ''}
+    <a href="${esc(ref.url)}" target="_blank" rel="noopener noreferrer">Abrir fonte original</a>
+  </div>`;
+}
+
+function sourceCard(ref, nested = false) {
+  return `<article class="source" ${nested ? '' : `id="source-${esc(ref.id)}"`}>
+      <small>${esc(ref.kind || 'Diretriz ou protocolo')} · ${esc(ref.organization)} · ${esc(ref.year)}</small>
+      <h3>${esc(ref.title)}</h3>
       <small>${esc(ref.section)}</small><p>${esc(ref.text)}</p>
-      <a href="${esc(ref.url)}" target="_blank" rel="noopener noreferrer">Abrir fonte original</a>
+      ${sourceLinks(ref)}
     </article>`;
 }
 
+export function renderLibraryResults(query = '') {
+  const normalize = text => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const tokens = normalize(query.trim()).split(/\s+/).filter(Boolean);
+  const matches = PROTOCOLS.filter(ref => {
+    const fields = normalize([ref.kind, ref.title, ref.organization, ref.type, TYPES[ref.type], ref.section, ref.text, ...ref.tags].join(' '));
+    return tokens.every(term => fields.includes(term));
+  });
+  return matches.length ? matches.map(ref => sourceCard(ref)).join('') : '<p>Nenhuma referência encontrada para essa busca.</p>';
+}
+
 function reportScreen(state) {
-  const { hypothesis, stage, infection, rationale, suggestions, references, examination, pending } = state.report;
+  const { hypothesis, stage, infection, rationale, suggestions, treatment, references, examination, pending, visualReview } = state.report;
   return `${heading('Resumo da avaliação', 'Confira o registro e as pendências antes de concluir.')}
     ${urgencyNotice(state.exam)}
     <section class="report-block">
       <h3>Achados da foto</h3>
-      <p><strong>${esc(suggestedType(state.type))}</strong> · ${esc(state.vision.description)}</p>
+      <p><strong>WILLIE</strong> · ${esc(suggestedType(state.type))}</p>
+      ${state.vision ? `<p><strong>Gemini</strong> · ${esc(state.vision.description)}</p>` : ''}
+      ${visualReview.length ? `<ul>${visualReview.map(({ label, status }) =>
+        `<li>${esc(label)} · ${esc(status)}</li>`).join('')}</ul>` : ''}
     </section>
     <div class="report-grid">
       ${sectionReport('Hipótese clínica', hypothesis, references)}
@@ -204,10 +245,18 @@ function reportScreen(state) {
     ${examination.length ? `<details class="recorded"><summary>Respostas registradas no exame</summary><dl>
       ${examination.map(item => `<div><dt>${esc(item.question)}</dt><dd>${esc(item.answer)}</dd></div>`).join('')}
       </dl></details>` : ''}
-    <section class="report-block"><h3>O que revisar</h3><ul>${suggestions.map(item =>
+    <section class="report-block"><h3>Conduta a discutir com a equipe</h3><ul>${suggestions.map(item =>
       `<li><p>${esc(item.text)}</p>${citationLinks(item.refs, references)}</li>`).join('')}</ul></section>
+    <section class="report-block treatment"><h3>Tratamento e evidências</h3>
+      ${treatment.length ? treatment.map(item => `<section class="treatment-topic">
+        <h4>${esc(item.title)}</h4><p>${esc(item.text)}</p>
+        <details><summary>Consultar diretriz e evidência</summary>
+          ${item.refs.map(id => references.find(ref => ref.id === id)).filter(Boolean).map(ref => sourceCard(ref, true)).join('')}
+        </details>
+      </section>`).join('') : '<p>A hipótese clínica ficou indeterminada ou a lesão não foi confirmada. Você pode consultar a biblioteca para revisar os critérios.</p>'}
+    </section>
     <section class="sources"><h3>Referências da avaliação</h3>
-      ${references.length ? references.map(sourceCard).join('') : '<p>Nenhum trecho aplicável encontrado para este caso.</p>'}</section>
+      ${references.length ? references.map(ref => sourceCard(ref)).join('') : '<p>Nenhum trecho aplicável encontrado para este caso.</p>'}</section>
     <footer class="sheet-actions"><button class="btn" data-step="2">Revisar exame</button>
       <button class="btn primary" data-action="reset">Nova avaliação</button></footer>`;
 }
@@ -221,12 +270,16 @@ export function renderView(state) {
     </div>`;
   }
   if (state.page === 'library') {
-    return `<h1>Referências</h1><div class="sheet library">${PROTOCOLS.map(sourceCard).join('')}</div>`;
+    return `<h1>Biblioteca</h1><div class="sheet library">
+      <label class="reference-search">Buscar por tema, diretriz ou tratamento
+        <input id="reference-search" type="search" placeholder="Ex.: compressão, pé diabético, curativo">
+      </label><div id="reference-results" aria-live="polite">${renderLibraryResults()}</div>
+    </div>`;
   }
   return `<h1>Sobre o Medical Eye</h1><section class="sheet about">
     ${heading('Avaliação e dados da consulta')}
-    <p>O Medical Eye apoia o registro da avaliação de feridas por profissionais, internos e estudantes de saúde. O Gemini sugere um tipo de ferida e descreve a imagem. O profissional registra as respostas clínicas e revisa o resumo com as referências.</p>
-    <p>O navegador converte a foto para JPEG antes do envio e remove os metadados do arquivo original. A foto é enviada ao Gemini somente na análise inicial. A consulta às diretrizes e o resumo são processados na aplicação, com a base local.</p>
+    <p>O Medical Eye apoia o registro da avaliação de feridas por profissionais, internos e estudantes de saúde. O WILLIE sugere o tipo de ferida e estima o contorno. O Gemini pode sugerir achados da imagem. O profissional confirma os achados no exame e revisa as orientações de conduta e tratamento com as referências.</p>
+    <p>O navegador converte a foto para JPEG antes do envio e remove os metadados do arquivo original. A foto segue para o WILLIE no servidor do Medical Eye. Quando autorizado, a mesma foto segue para o Gemini na análise inicial. A consulta às diretrizes e o resumo são processados na aplicação, com a base local.</p>
     <p>A foto e as respostas ficam em memória durante a sessão. O uso assistencial depende de validação clínica e institucional.</p>
   </section>`;
 }

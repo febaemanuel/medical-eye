@@ -8,3 +8,4 @@ __pycache__/
 *.pt
 *.zip
 node_modules/
+references/

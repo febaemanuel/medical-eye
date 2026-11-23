@@ -16,6 +16,10 @@ export const VISUAL = Object.freeze({
   no_visible_opening: 'Abertura na pele não claramente visível',
 });
 
+export const VISUAL_REVIEW = Object.freeze({
+  confirmed: 'Confirmado no exame', absent: 'Ausente no exame', unknown: 'Não consegui avaliar',
+});
+
 const tri = [['yes', 'Sim'], ['no', 'Não'], ['unknown', 'Não avaliado']];
 const question = (id, label, options = tri, hint = '') => ({ id, label, options, hint });
 
@@ -30,15 +34,30 @@ export const QUESTIONS = [
     ['unknown', 'Ainda não definido'],
   ]),
   question('diabetes', 'A pessoa tem diagnóstico de diabetes?'),
+  question('duration', 'Há quanto tempo a lesão foi percebida?', [
+    ['days', 'Menos de 2 semanas'], ['weeks', '2 a 6 semanas'], ['longer', 'Mais de 6 semanas'], ['unknown', 'Não informado'],
+  ]),
   question('fever', 'Houve febre relatada ou aferida?'),
   question('systemic', 'Há outros sinais sistêmicos preocupantes?', tri, 'Considere calafrios, confusão ou instabilidade.'),
   question('rapid', 'Há piora rápida, dor desproporcional ou suspeita de acometimento grave?'),
   question('footLocation', 'A lesão está no pé?'),
+  question('plantar', 'A ferida está na região plantar do antepé ou mediopé?'),
+  question('neuropathy', 'Há neuropatia documentada no pé?', tri, 'Considere a avaliação da sensibilidade protetora realizada pela equipe.'),
+  question('footPerfusion', 'Como está registrada a perfusão do pé?', [
+    ['adequate', 'Avaliada, sem alteração identificada'], ['concern', 'Há suspeita de comprometimento'], ['unknown', 'Não avaliada'],
+  ]),
   question('pressureExposure', 'A história ou o exame indicam pressão ou cisalhamento na região?'),
+  question('mobility', 'A pessoa precisa de ajuda para mudar de posição?'),
   question('surgerySite', 'A lesão corresponde ao local de uma cirurgia registrada?'),
+  question('surgeryTiming', 'Quando foi feita a cirurgia?', [
+    ['recent', 'Há até 30 dias'], ['older', 'Há mais de 30 dias'], ['unknown', 'Não informado'],
+  ]),
   question('incisionOpening', 'Houve abertura dos bordos da incisão?'),
   question('legLocation', 'A lesão fica na perna?'),
   question('venousHistory', 'Há história conhecida de doença venosa na perna?'),
+  question('arterialAssessment', 'Há avaliação arterial documentada para considerar compressão?', [
+    ['eligible', 'Compatível com compressão segundo a equipe'], ['concern', 'Há restrição ou suspeita de doença arterial'], ['unknown', 'Pendente ou indisponível'],
+  ]),
   question('purulence', 'Há secreção purulenta ao exame?'),
   question('erythema', 'Até onde vai a vermelhidão a partir da borda?', [
     ['none', 'Sem eritema'],
@@ -79,14 +98,16 @@ export const QUESTIONS = [
 ];
 
 const contextFields = new Set([
-  'wound', 'etiology', 'diabetes', 'fever', 'systemic', 'rapid',
-  'footLocation', 'pressureExposure', 'surgerySite', 'legLocation', 'venousHistory',
+  'wound', 'etiology', 'diabetes', 'duration', 'fever', 'systemic', 'rapid',
+  'footLocation', 'pressureExposure', 'mobility', 'surgerySite', 'surgeryTiming', 'legLocation', 'venousHistory',
 ]);
 const noWoundFields = new Set(['wound', 'diabetes', 'fever', 'systemic', 'rapid']);
 const specificFields = {
   footLocation: 'diabetic', alternative: 'diabetic', deepInfection: 'diabetic', sirs: 'diabetic',
-  pressureExposure: 'pressure', pressureTissue: 'pressure',
-  surgerySite: 'surgical', incisionOpening: 'surgical', legLocation: 'venous', venousHistory: 'venous',
+  footPerfusion: 'diabetic', plantar: 'diabetic', neuropathy: 'diabetic',
+  pressureExposure: 'pressure', pressureTissue: 'pressure', mobility: 'pressure',
+  surgerySite: 'surgical', surgeryTiming: 'surgical', incisionOpening: 'surgical',
+  legLocation: 'venous', venousHistory: 'venous', arterialAssessment: 'venous',
 };
 const imageCues = {
   redness: ['erythema'], yellow: ['purulence'], swelling: ['swelling'],

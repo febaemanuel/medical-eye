@@ -1,4 +1,4 @@
-"""Internal HTTP interface for the single-label WILLIE classifier."""
+"""Internal HTTP interface for WILLIE classification and segmentation."""
 
 from contextlib import asynccontextmanager
 from io import BytesIO
@@ -52,4 +52,4 @@ async def classify(request: Request):
             predicted = await run_in_threadpool(request.app.state.model.predict, photo)
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as error:
         raise HTTPException(400, "Imagem inválida") from error
-    return {"class": predicted}
+    return predicted

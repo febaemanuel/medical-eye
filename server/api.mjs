@@ -1,17 +1,23 @@
-import { QUESTIONS, TYPES, questionsFor } from '../web/app/domain.mjs';
+import { QUESTIONS, TYPES, VISUAL_REVIEW, questionsFor } from '../web/app/domain.mjs';
 import { draftReport } from './assessment.mjs';
-import { ApiError, DEFAULT_MODEL, analyzeImage, checkedVision } from './providers.mjs';
+import { ApiError, DEFAULT_MODEL, analyzeImage, analyzeWithWillie, checkedVision } from './providers.mjs';
 
 const maxImageBytes = 4 * 1024 * 1024;
 const questionById = new Map(QUESTIONS.map(item => [item.id, item]));
 
 function checkedCase(payload) {
-  if (payload?.authorized !== true || (payload.type !== null && !Object.hasOwn(TYPES, payload.type)) ||
+  if (payload?.authorized !== true || (payload.type !== null && (typeof payload.type !== 'string' || !Object.hasOwn(TYPES, payload.type))) ||
       !payload.exam || typeof payload.exam !== 'object' || Array.isArray(payload.exam)) {
     throw new ApiError(400, 'Confirme a autorização e preencha os campos do exame.');
   }
-  const vision = checkedVision(payload.vision, 400);
-  const type = vision.quality === 'poor' ? null : payload.type;
+  const vision = payload.vision == null ? null : checkedVision(payload.vision, 400);
+  const type = payload.type;
+  const findings = vision?.findings ?? [];
+  const visualReview = payload.visualReview ?? {};
+  if (!visualReview || typeof visualReview !== 'object' || Array.isArray(visualReview) ||
+      Object.entries(visualReview).some(([key, value]) => !findings.includes(key) || !Object.hasOwn(VISUAL_REVIEW, value))) {
+    throw new ApiError(400, 'Há uma revisão de achado visual inválida.');
+  }
   const exam = {};
   for (const [key, value] of Object.entries(payload.exam)) {
     if (!questionById.get(key)?.options.some(([id]) => id === value)) {
@@ -19,12 +25,12 @@ function checkedCase(payload) {
     }
     exam[key] = value;
   }
-  const activeQuestions = questionsFor(type, vision.findings, exam);
+  const activeQuestions = questionsFor(type, findings, exam);
   if (activeQuestions.some(({ id }) => !Object.hasOwn(exam, id))) {
     throw new ApiError(400, 'Responda às perguntas ou marque quando um achado não foi avaliado.');
   }
   return {
-    type, vision, findings: vision.findings,
+    type, vision, findings, visualReview,
     exam: Object.fromEntries(activeQuestions.map(({ id }) => [id, exam[id]])),
   };
 }
@@ -37,13 +43,12 @@ export async function handleApi(request, config) {
   const path = new URL(request.url).pathname;
   try {
     if (path === '/api/config' && request.method === 'GET') {
-      return Response.json({ configured: configured(config), visionModel: config.VISION_MODEL || DEFAULT_MODEL });
+      return Response.json({ geminiConfigured: configured(config), visionModel: config.VISION_MODEL || DEFAULT_MODEL });
     }
     if (!['/api/analyze', '/api/report'].includes(path)) throw new ApiError(404, 'Rota não encontrada.');
     if (request.method !== 'POST') throw new ApiError(405, 'Método não permitido.');
 
     if (path === '/api/analyze') {
-      if (!configured(config)) throw new ApiError(503, 'Configure a chave do Gemini no servidor.');
       if (request.headers.get('x-image-authorized') !== 'yes') {
         throw new ApiError(400, 'Confirme a autorização para processar a imagem.');
       }
@@ -52,7 +57,18 @@ export async function handleApi(request, config) {
       if (image.length > maxImageBytes) throw new ApiError(413, 'A imagem excede o limite de 4 MB.');
       if (image.length < 6 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff ||
           image.at(-2) !== 0xff || image.at(-1) !== 0xd9) throw new ApiError(400, 'O arquivo não é um JPEG válido.');
-      return Response.json(await analyzeImage(image, config));
+      const cloudAllowed = request.headers.get('x-gemini-authorized') === 'yes' && configured(config);
+      const [willie, gemini] = await Promise.allSettled([
+        analyzeWithWillie(image, config),
+        cloudAllowed ? analyzeImage(image, config) : Promise.resolve(null),
+      ]);
+      return Response.json({
+        type: willie.value?.type ?? null,
+        mask: willie.value?.mask ?? null,
+        vision: gemini.value ?? null,
+        willieError: willie.status === 'rejected' ? willie.reason.message : null,
+        visionError: gemini.status === 'rejected' ? gemini.reason.message : null,
+      });
     }
 
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') {

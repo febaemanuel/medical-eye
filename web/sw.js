@@ -1,6 +1,6 @@
-const CACHE = 'medical-eye-shell-v3';
+const CACHE = 'medical-eye-shell-v4';
 const SHELL = [
-  '/', '/assets/3/styles.css', '/assets/3/app/main.mjs', '/assets/3/app/views.mjs', '/assets/3/app/icons.mjs', '/assets/3/app/domain.mjs', '/assets/3/app/evidence.mjs', '/assets/3/data/protocolos.mjs',
+  '/', '/assets/4/styles.css', '/assets/4/app/main.mjs', '/assets/4/app/views.mjs', '/assets/4/app/icons.mjs', '/assets/4/app/domain.mjs', '/assets/4/app/evidence.mjs', '/assets/4/data/protocolos.mjs', '/assets/4/data/treatment.mjs', '/assets/4/data/documents.mjs',
   '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png',
   '/icons/maskable-512.png', '/fonts/dm-sans.woff2',
 ];

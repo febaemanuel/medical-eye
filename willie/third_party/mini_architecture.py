@@ -1,4 +1,4 @@
-"""WILLIE MINI classification layers adapted from the authors' MIT-licensed notebook.
+"""WILLIE MINI classification and segmentation layers adapted from the authors' MIT-licensed notebook.
 
 Source: Qian-Group-HRI/Willie, 06_WILLIE_MINI.ipynb,
 revision 221f2e7ef470810422436c12730834c82e9bdc8f.
@@ -221,3 +221,88 @@ class ClassificationDecoder(nn.Module):
                 if mask.any():
                     logits[mask] += w[mask, k:k+1] * self.experts[e](fused[mask])
         return logits, self.embed_head(fused)
+
+
+class ChannelSE(nn.Module):
+    def __init__(self, ch, r=16):
+        super().__init__()
+        mid = max(ch // r, 4)
+        self.fc = nn.Sequential(nn.AdaptiveAvgPool2d(1), nn.Flatten(1),
+                                nn.Linear(ch, mid, bias=False), nn.ReLU(True),
+                                nn.Linear(mid, ch, bias=False), nn.Sigmoid())
+    def forward(self, x):
+        return x * self.fc(x).view(x.shape[0], -1, 1, 1)
+
+class SpatialSE(nn.Module):
+    def __init__(self, ch):
+        super().__init__()
+        self.conv = nn.Conv2d(ch, 1, 1, bias=False)
+    def forward(self, x):
+        return x * torch.sigmoid(self.conv(x))
+
+class ParallelScSE(nn.Module):
+    """Full: additive(cSE+sSE) + maxout(cSE,sSE). Shortened: additive only."""
+    def __init__(self, ch, r=16, shortened=False):
+        super().__init__()
+        self.shortened = shortened
+        self.cse_a, self.sse_a = ChannelSE(ch, r), SpatialSE(ch)
+        if not shortened:
+            self.cse_m, self.sse_m = ChannelSE(ch, r), SpatialSE(ch)
+    def forward(self, x):
+        add = self.cse_a(x) + self.sse_a(x)
+        if self.shortened:
+            return add
+        return add + torch.max(self.cse_m(x), self.sse_m(x))
+
+
+# 8. FiLM CONDITIONER (WTCS bridge)
+class FiLMConditioner(nn.Module):
+    def __init__(self, embed_dim, feat_dim):
+        super().__init__()
+        self.gamma = nn.Sequential(nn.Linear(embed_dim, feat_dim), nn.Sigmoid())
+        self.beta = nn.Linear(embed_dim, feat_dim)
+    def forward(self, feat, embed):
+        g = self.gamma(embed).unsqueeze(-1).unsqueeze(-1) + 1.0
+        b = self.beta(embed).unsqueeze(-1).unsqueeze(-1)
+        return g * feat + b
+
+
+# 9. SEGMENTATION DECODER (P-scSE + FiLM/WTCS)
+#    FUSegNet arrangement: Conv-BN-ReLU → P-scSE (middle) → Conv-BN-ReLU
+class PscSEDecoderStage(nn.Module):
+    """Conv → P-scSE (middle) → Conv. Top stage uses shortened P-scSE."""
+    def __init__(self, in_ch, out_ch, r=16, shortened=False):
+        super().__init__()
+        self.conv1 = nn.Sequential(nn.Conv2d(in_ch, out_ch, 3, padding=1, bias=False), nn.BatchNorm2d(out_ch), nn.ReLU(True))
+        self.pscse = ParallelScSE(out_ch, r, shortened)
+        self.conv2 = nn.Sequential(nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False), nn.BatchNorm2d(out_ch), nn.ReLU(True))
+    def forward(self, x):
+        return self.conv2(self.pscse(self.conv1(x)))
+
+class SegmentationDecoder(nn.Module):
+    """Progressive decode P4→P1 with FiLM + P-scSE at each stage."""
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        F = cfg.fpn_dim
+        self.films = nn.ModuleList([FiLMConditioner(cfg.cls_embed_dim, F) for _ in range(cfg.fpn_levels)])
+        self.stages = nn.ModuleList([
+            PscSEDecoderStage(F*2, F, cfg.pscse_reduction, shortened=(i == cfg.fpn_levels - 2))
+            for i in range(cfg.fpn_levels - 1)
+        ])
+        self.head = nn.Sequential(
+            nn.Conv2d(F, F//2, 3, padding=1, bias=False), nn.BatchNorm2d(F//2), nn.ReLU(True),
+            nn.Conv2d(F//2, F//4, 3, padding=1, bias=False), nn.BatchNorm2d(F//4), nn.ReLU(True),
+            nn.Conv2d(F//4, cfg.seg_out_channels, 1),
+        )
+
+    def forward(self, pyr, wound_embed, target_size=None):
+        if target_size is None: target_size = self.cfg.img_size
+        cond = [self.films[i](pyr[i], wound_embed) for i in range(self.cfg.fpn_levels)]
+        x = cond[-1]
+        for s in range(self.cfg.fpn_levels - 1):
+            skip = cond[self.cfg.fpn_levels - 2 - s]
+            x = F.interpolate(x, size=skip.shape[-2:], mode="bilinear", align_corners=False)
+            x = self.stages[s](torch.cat([x, skip], 1))
+        x = F.interpolate(x, size=target_size, mode="bilinear", align_corners=False)
+        return self.head(x)

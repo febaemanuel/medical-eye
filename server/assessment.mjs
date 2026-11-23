@@ -1,5 +1,5 @@
 import { PROTOCOLS } from '../web/data/protocolos.mjs';
-import { TYPES, VISUAL, confirmedType, questionScope, questionsFor, urgent } from '../web/app/domain.mjs';
+import { TYPES, VISUAL, VISUAL_REVIEW, confirmedType, questionScope, questionsFor, urgent } from '../web/app/domain.mjs';
 import { guidanceFor } from '../web/app/evidence.mjs';
 
 const normalize = value => value.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
@@ -47,7 +47,7 @@ const pressureDepth = {
 const hypothesisFor = {
   diabetic: 'Lesão do pé em pessoa com diabetes',
   pressure: 'Lesão por pressão',
-  surgical: 'Complicação em ferida cirúrgica',
+  surgical: 'Lesão em ferida cirúrgica',
   venous: 'Úlcera de perna de etiologia venosa',
 };
 
@@ -97,8 +97,42 @@ const conduct = {
   venous: ['Reavaliar os sinais de infecção e o manejo da etiologia da úlcera de perna.', 'nice-ulcera'],
 };
 
+function treatmentFor(scope, exam, assessment) {
+  switch (scope) {
+    case 'diabetic': {
+      const plantar = exam.plantar === 'yes' && exam.neuropathy === 'yes';
+      const offloading = exam.footPerfusion !== 'adequate'
+        ? 'Confira a avaliação vascular e os critérios de infecção antes de selecionar a descarga. A diretriz tem opções diferentes conforme esses achados.'
+        : plantar
+          ? 'Localização plantar e neuropatia foram registradas. Compare as opções para esse perfil e confirme tolerância, infecção e contraindicações com a equipe.'
+          : 'Consulte a opção de descarga correspondente à localização e à avaliação de sensibilidade do pé.';
+      const infection = assessment.infection.includes('IWGDF/IDSA 1')
+        ? 'O exame registrou ausência dos sinais avaliados. Consulte a recomendação 11 sobre o papel dos antibióticos em úlcera clinicamente não infectada.'
+        : 'Confira se os achados clínicos preenchem os critérios de infecção e de gravidade antes de discutir antimicrobianos.';
+      return [
+        ['Descarga de pressão', offloading, ['iwgdf-perfusao', 'lazzarini-descarga']],
+        ['Cuidado local e cicatrização', 'Confira as condições do leito e o exsudato para discutir a cobertura e a necessidade de desbridamento.', ['iwgdf-cicatrizacao']],
+        ['Infecção e antimicrobianos', infection, ['iwgdf-exame', 'iwgdf-antibioticos']],
+      ];
+    }
+    case 'pressure':
+      return [['Alívio de pressão e cuidado local', 'Revise mobilidade, superfície de suporte, tecido e exsudato com a equipe para escolher as medidas de alívio e cuidado local.', ['nice-pressao-tratamento', 'anvisa-prevencao']]];
+    case 'surgical':
+      return [['Cuidado da incisão', exam.incisionOpening === 'yes'
+        ? 'Foi registrada abertura da incisão. Revise profundidade e sinais locais com a equipe cirúrgica e consulte o cuidado para cicatrização por segunda intenção.'
+        : 'Use o intervalo desde a cirurgia e o exame da incisão para consultar os cuidados de limpeza, cobertura e reavaliação.', ['nice-cirurgia-tratamento']]];
+    case 'venous':
+      return [['Avaliação arterial e compressão', exam.arterialAssessment === 'eligible'
+        ? 'A equipe registrou elegibilidade para compressão. Compare as opções para o perfil avaliado e a evidência sobre os sistemas estudados.'
+        : 'Revise a avaliação arterial e as restrições com a equipe antes de selecionar a modalidade de compressão.', ['esvs-compressao', 'venus-6']],
+      ['Avaliação de infecção da úlcera de perna', 'Confira os sinais locais e sistêmicos registrados e compare com os critérios de avaliação e reavaliação da diretriz.', ['nice-ulcera', 'nice-ulcera-urgencia']]];
+    default:
+      return [];
+  }
+}
+
 export function draftReport(caseData) {
-  const { exam, type, findings } = caseData;
+  const { exam, type, findings, visualReview = {} } = caseData;
   const assessment = clinicalAssessment(exam);
   const scope = confirmedType(exam);
   const referencesById = new Map(retrieve(caseData).map(ref => [ref.id, ref]));
@@ -142,6 +176,11 @@ export function draftReport(caseData) {
   if (conduct[scope]) suggestions.push(section(...conduct[scope]));
   if (!suggestions.length) suggestions.push(section('Rever a história e o exame antes de propor conduta específica.'));
 
+  const treatment = treatmentFor(scope, exam, assessment).map(([title, text, refs]) => {
+    for (const id of refs) appendReference(PROTOCOLS.find(ref => ref.id === id));
+    return { title, text, refs };
+  });
+
   const report = {
     hypothesis: section(hypothesis, firstSource),
     stage: section(assessment.stage, scope === 'pressure' ? 'anvisa-estagios' : undefined),
@@ -150,6 +189,8 @@ export function draftReport(caseData) {
       ? 'O resumo considera o contexto, a história e os achados registrados no exame.'
       : 'O contexto clínico depende da confirmação da lesão, da história e dos achados do exame.', firstSource),
     suggestions,
+    treatment,
+    visualReview: findings.map(id => ({ label: VISUAL[id], status: VISUAL_REVIEW[visualReview[id]] || 'Aguardando revisão' })),
     examination,
     pending,
     assessment,
