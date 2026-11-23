@@ -7,8 +7,6 @@ export const TREATMENT_SOURCES = [
     text: 'Descarregar é redistribuir a pressão que incide sobre a ferida ao apoiar o pé. A diretriz diferencia as opções pela localização da úlcera, presença de neuropatia, infecção ou isquemia, tolerância e contraindicações. Para úlcera neuropática plantar do antepé ou mediopé, a primeira opção descrita é um dispositivo não removível até o joelho, quando indicado e tolerado. A estratégia muda quando há isquemia ou infecção.',
     tags: ['planta', 'neuropatia', 'perfusão', 'descarga', 'tratamento'],
     guidance: {
-      plantar: 'Localize no exame a área de apoio da ferida. As primeiras recomendações são específicas para antepé ou mediopé plantar.',
-      neuropathy: 'Consulte o exame documentado de sensibilidade e o contexto clínico. A recomendação de primeira linha se refere à úlcera neuropática.',
       footPerfusion: 'Confira a avaliação vascular registrada pela equipe. A diretriz distingue opções de descarga quando há isquemia ou infecção.',
     },
   },
@@ -50,7 +48,6 @@ export const TREATMENT_SOURCES = [
     url: 'https://www.nice.org.uk/guidance/cg179/chapter/Recommendations#management',
     text: 'A diretriz orienta redistribuir pressão com superfícies de suporte apropriadas. Na escolha de coberturas e na avaliação da necessidade de desbridamento, considere dor, exsudato, tecido, extensão da lesão e tolerância.',
     tags: ['pressão', 'mobilidade', 'reposicionamento', 'curativo', 'desbridamento', 'tratamento'],
-    guidance: { mobility: 'Registre quanto auxílio a pessoa precisa para reposicionar-se. Avalie as superfícies de suporte e o plano de alívio da pressão com a equipe.' },
   },
   {
     id: 'nice-cirurgia-tratamento', type: 'surgical', organization: 'NICE', year: 2019,
@@ -59,7 +56,6 @@ export const TREATMENT_SOURCES = [
     url: 'https://www.nice.org.uk/guidance/ng125/chapter/recommendations#postoperative-phase',
     text: 'A diretriz descreve a limpeza e a troca de curativo no pós-operatório e a seleção de coberturas em cicatrização por segunda intenção. Se houver suspeita clínica de infecção, a equipe reavalia a incisão e considera os microrganismos prováveis, a resistência local e os resultados microbiológicos.',
     tags: ['cirurgia', 'incisão', 'curativo', 'tratamento', 'infecção'],
-    guidance: { surgeryTiming: 'Consulte o prontuário e registre a data ou intervalo desde a cirurgia. A etapa pós-operatória orienta a consulta ao protocolo da equipe.' },
   },
   {
     id: 'esvs-compressao', type: 'venous', organization: 'ESVS', year: 2022,

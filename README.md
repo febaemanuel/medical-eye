@@ -3,7 +3,7 @@
 Ficha de avaliação de feridas para navegador e instalação como PWA. Pensada para profissionais, internos e estudantes em prática supervisionada.
 
 - **Foto.** O WILLIE MINI roda localmente e sugere o tipo e o contorno. Com a chave e a autorização de envio, o Gemini descreve a foto e propõe achados em uma única chamada.
-- **Exame.** O profissional revisa as sugestões. O tipo e os achados orientam o roteiro, que acompanha as correções registradas na consulta.
+- **Exame.** O tipo e os achados da foto selecionam as perguntas essenciais. O profissional pode mudar o roteiro e responde apenas pelo exame.
 - **Conduta e tratamento.** O resumo reúne o exame, a hipótese, as pendências e as orientações aplicáveis, com as seções das diretrizes e estudos. A biblioteca permite buscar por tema e abrir os PDFs baixados no servidor.
 
 ## Rodar no Windows

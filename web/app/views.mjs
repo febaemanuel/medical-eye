@@ -1,4 +1,4 @@
-import { TYPES, VISUAL, VISUAL_REVIEW, questionsFor, urgent } from './domain.mjs';
+import { TYPES, VISUAL, questionsFor, urgent } from './domain.mjs';
 import { guidanceFor } from './evidence.mjs';
 import { PROTOCOLS } from '../data/protocolos.mjs';
 import { pdfLink } from '../data/documents.mjs';
@@ -98,7 +98,7 @@ function imageScreen(state) {
 
 function findingsScreen(state) {
   const { vision } = state;
-  return `${heading('Achados da foto', 'Revise a sugestão do WILLIE e confira na lesão os achados da imagem.')}
+  return `${heading('Achados da foto')}
     <div class="finding-layout">
       <div>
         <div class="photo-layer">
@@ -112,7 +112,9 @@ function findingsScreen(state) {
           <div><span>Tipo sugerido pelo WILLIE</span><strong>${esc(suggestedType(state.type))}</strong></div>
           ${vision ? `<div><span>Qualidade da imagem</span><strong>${esc(quality[vision.quality])}</strong></div>` : ''}
         </div>
-        ${vision ? `<p class="image-cue">Descrição do Gemini</p><p>${esc(vision.description)}</p>` : ''}
+        ${vision ? `<h3 class="image-cue">Achados sugeridos pelo Gemini</h3>
+          ${vision.findings.length ? `<ul>${vision.findings.map(id => `<li>${esc(VISUAL[id])}</li>`).join('')}</ul>`
+            : `<p>${esc(vision.description)}</p>`}` : ''}
         ${!state.maskUrl && !state.willieError ? '<p class="quiet">Sem contorno identificado nesta foto.</p>' : ''}
       </div>
     </div>
@@ -121,15 +123,6 @@ function findingsScreen(state) {
     ${state.error ? notice(state.error, 'danger') : ''}
     ${vision?.quality === 'poor' ? notice('Considere tirar outra foto. A leitura do WILLIE também deve ser revisada.', 'warning') : ''}
     ${state.type === 'no_wound' ? notice('O WILLIE marcou imagem sem ferida visível. Confira a pele no exame.') : ''}
-    ${vision?.findings.length ? `<section class="visual-checklist" aria-label="Revisar achados sugeridos">
-      <h3>Achados sugeridos pelo Gemini</h3>
-      ${vision.findings.map(id => `<fieldset class="question">
-        <legend>${esc(VISUAL[id])}</legend>
-        <div class="options">${Object.entries(VISUAL_REVIEW).map(([value, label]) => `
-          <label><input type="radio" data-visual="${id}" name="visual-${id}" value="${value}"
-            ${state.visualReview[id] === value ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}</div>
-      </fieldset>`).join('')}
-    </section>` : ''}
     <footer class="sheet-actions"><button class="btn" data-step="0" ${state.pending ? 'disabled' : ''}>Voltar à foto</button>
       <div class="actions">
         ${state.willieError || state.visionError ? `<button class="btn" data-action="retry-analysis" ${state.pending || !state.authorized ? 'disabled' : ''}>
@@ -138,18 +131,17 @@ function findingsScreen(state) {
       </div></footer>`;
 }
 
-export function urgencyNotice(exam) {
-  if (urgent(exam)) return notice('Sinal de alerta no exame. Priorize avaliação presencial urgente conforme o protocolo local.', 'danger');
-  if (exam.fever === 'yes') return notice('Febre registrada. Confira os demais sinais sistêmicos e o protocolo local.', 'warning');
+export function urgencyNotice(exam, type) {
+  if (urgent(exam, type)) return notice('Sinal de alerta no exame. Priorize avaliação presencial urgente conforme o protocolo local.', 'danger');
+  if (exam.alerts === 'fever') return notice('Febre registrada. Confira os demais sinais sistêmicos e o protocolo local.', 'warning');
   return '';
 }
 
 function questionField(question, state) {
-  const { id, label, options, hint, fromImage } = question;
+  const { id, label, options, hint } = question;
   const guidance = guidanceFor(id, state.type, state.exam);
   const selected = state.exam[id];
   return `<fieldset class="question"><legend>${esc(label)}</legend>
-    ${fromImage ? '<p class="image-cue">Pergunta aberta por um achado da foto</p>' : ''}
     ${hint ? `<p class="hint">${esc(hint)}</p>` : ''}
     <div class="options">${options.map(([value, title]) => `
       <label><input type="radio" name="${id}" value="${value}" ${selected === value ? 'checked' : ''} ${state.pending ? 'disabled' : ''}>
@@ -172,10 +164,18 @@ function examScreen(state) {
     ['examination', 'Exame da lesão'],
   ];
 
-  return `${heading('Consulta e exame', 'Registre o que observou ou marque o que ficou pendente.')}
+  return `${heading('Consulta e exame')}
     <p class="completion" id="completion" aria-live="polite"></p>
-    <div id="urgent">${urgencyNotice(state.exam)}</div>
+    <div id="urgent">${urgencyNotice(state.exam, state.type)}</div>
     <form id="exam-form">
+      ${state.exam.wound !== 'no' ? `<label class="exam-route">Roteiro de exame
+        <select id="exam-route" ${state.pending ? 'disabled' : ''}>
+          <option value="">${state.type && state.type !== 'no_wound' ? 'WILLIE · ' + esc(TYPES[state.type]) : 'Roteiro geral'}</option>
+          ${Object.entries(TYPES).filter(([id]) => id !== 'no_wound' && id !== state.type).map(([id, title]) =>
+            `<option value="${id}" ${state.exam.etiology === id ? 'selected' : ''}>${esc(title)}</option>`).join('')}
+          ${state.type && state.type !== 'no_wound' ? `<option value="unknown" ${state.exam.etiology === 'unknown' ? 'selected' : ''}>Tipo indeterminado</option>` : ''}
+        </select>
+      </label>` : ''}
       ${groups.map(([group, title]) => {
         const items = questions.filter(question => question.group === group);
         return items.length ? `<section class="question-group" aria-labelledby="group-${group}">
@@ -228,15 +228,15 @@ export function renderLibraryResults(query = '') {
 }
 
 function reportScreen(state) {
-  const { hypothesis, stage, infection, rationale, suggestions, treatment, references, examination, pending, visualReview } = state.report;
+  const { hypothesis, stage, infection, rationale, suggestions, treatment, references, examination, pending } = state.report;
   return `${heading('Resumo da avaliação', 'Confira o registro e as pendências antes de concluir.')}
-    ${urgencyNotice(state.exam)}
+    ${urgencyNotice(state.exam, state.type)}
     <section class="report-block">
       <h3>Achados da foto</h3>
       <p><strong>WILLIE</strong> · ${esc(suggestedType(state.type))}</p>
-      ${state.vision ? `<p><strong>Gemini</strong> · ${esc(state.vision.description)}</p>` : ''}
-      ${visualReview.length ? `<ul>${visualReview.map(({ label, status }) =>
-        `<li>${esc(label)} · ${esc(status)}</li>`).join('')}</ul>` : ''}
+      ${state.vision ? `<p><strong>Gemini</strong> · ${esc(state.vision.findings.length
+        ? state.vision.findings.map(id => VISUAL[id]).join('; ')
+        : state.vision.description)}</p>` : ''}
     </section>
     <div class="report-grid">
       ${sectionReport('Hipótese clínica', hypothesis, references)}
@@ -283,7 +283,7 @@ export function renderView(state) {
   }
   return `<h1>Sobre o Medical Eye</h1><section class="sheet about">
     ${heading('Avaliação e dados da consulta')}
-    <p>O Medical Eye apoia o registro da avaliação de feridas por profissionais, internos e estudantes de saúde. O WILLIE sugere o tipo de ferida e estima o contorno. O Gemini pode sugerir achados da imagem. O profissional confirma os achados no exame e revisa as orientações de conduta e tratamento com as referências.</p>
+    <p>O Medical Eye apoia o registro da avaliação de feridas por profissionais, internos e estudantes de saúde. O WILLIE sugere o tipo de ferida e estima o contorno. O Gemini pode sugerir achados da imagem. A foto direciona as perguntas, e o profissional registra o exame e revisa as orientações de conduta e tratamento com as referências.</p>
     <p>O navegador converte a foto para JPEG antes do envio e remove os metadados do arquivo original. A foto segue para o WILLIE no servidor do Medical Eye. Quando autorizado, a mesma foto segue para o Gemini na análise inicial. A consulta às diretrizes e o resumo são processados na aplicação, com a base local.</p>
     <p>A foto e as respostas ficam em memória durante a sessão. O uso assistencial depende de validação clínica e institucional.</p>
   </section>`;

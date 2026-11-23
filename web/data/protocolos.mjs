@@ -15,8 +15,8 @@ export const PROTOCOLS = [
     text: 'A avaliação de infecção do pé em pessoas com diabetes usa achados clínicos. A tabela 1 considera secreção purulenta, calor, dor, edema ou induração e extensão do eritema. Também orienta a considerar causas alternativas de inflamação e a avaliar o envolvimento profundo e a resposta sistêmica.',
     tags: ['secreção', 'vermelhidão', 'profundidade', 'SIRS', 'diabetes'],
     guidance: {
-      diabetes: 'Confirme o diagnóstico de diabetes na história clínica ou no prontuário. A tabela 1 descreve infecção no pé em pessoas com diabetes.',
-      footLocation: 'Confirme a localização anatômica no exame. A classificação da tabela 1 se refere ao pé.',
+      diabeticContext: 'Confirme pelo exame que a lesão está no pé e consulte a história clínica ou o prontuário para verificar o diagnóstico de diabetes.',
+      localInflammation: 'Conte separadamente a presença de calor local, dor ou sensibilidade nova e edema ou endurecimento. A vermelhidão e a secreção são registradas em perguntas próprias.',
       erythema: 'A tabela 1 considera a extensão do eritema em qualquer direção a partir da margem da ferida. Registre a distância aferida no exame.',
       purulence: 'Verifique no exame se há secreção purulenta. Material amarelado visível na foto pode justificar a inspeção do exsudato.',
       deepInfection: 'Avalie se os sinais de infecção envolvem tecidos além da pele e do subcutâneo. Registre a profundidade anatômica da ferida no campo próprio.',
@@ -30,9 +30,6 @@ export const PROTOCOLS = [
     title: 'Infecção do pé relacionada ao diabetes', section: 'Recomendações 2 e 18, tabela 2', url: iwgdf,
     text: 'A diretriz recomenda avaliação cirúrgica urgente para infecção grave ou infecção moderada com complicações como gangrena extensa, sinais de abscesso profundo, infecção necrosante ou isquemia grave. A necessidade de hospitalização depende da gravidade e das comorbidades relevantes.',
     tags: ['sistêmico', 'urgência', 'piora', 'profundidade', 'necrose'],
-    guidance: {
-      rapid: 'Registre a evolução da lesão e se há suspeita de acometimento profundo, isquemia grave ou piora rápida. A tabela 2 lista achados que exigem avaliação mais atenta nesse contexto.',
-    },
   },
   {
     id: 'anvisa-estagios', type: 'pressure', organization: 'Anvisa', year: 2023,
@@ -64,7 +61,6 @@ export const PROTOCOLS = [
     tags: ['incisão', 'cirurgia', 'secreção', 'calor', 'sistêmico'],
     guidance: {
       surgerySite: 'Confirme o procedimento e o local da incisão no histórico ou prontuário, e relacione-os ao local da alteração observada.',
-      warmth: 'Examine a região da incisão e registre se há aumento de temperatura local junto de outros achados do exame.',
     },
   },
   {
@@ -74,10 +70,8 @@ export const PROTOCOLS = [
     text: 'A avaliação de infecção de úlcera da perna considera sinais como eritema ou edema além da borda, calor localizado, dor crescente ou febre. A avaliação também precisa considerar as condições de base, como insuficiência venosa e edema.',
     tags: ['venosa', 'eritema', 'edema', 'calor', 'úlcera'],
     guidance: {
-      legLocation: 'Localize a lesão no exame. Essa diretriz se refere a úlceras de perna.',
-      venousHistory: 'Confira história de insuficiência venosa e edema. Registre a história conhecida e avalie a causa de base junto aos demais achados.',
+      legLocation: 'Considere a localização, a avaliação clínica da circulação e a história de doença venosa antes de registrar a causa provável.',
       erythema: 'Observe se a vermelhidão se estende além da úlcera e registre a extensão aferida.',
-      swelling: 'Registre se o edema é localizado ou se se estende além da lesão. Compare com a condição de base e a evolução recente.',
     },
   },
   {
@@ -86,9 +80,6 @@ export const PROTOCOLS = [
     title: 'Infecção de úlcera de perna', section: 'NG152, itens 1.1.8–1.1.13', url: niceLeg,
     text: 'Reavalie em caso de piora rápida, comprometimento sistêmico ou dor intensa desproporcional. Suspeita de sepse, fasciíte necrosante ou osteomielite é motivo de avaliação hospitalar.',
     tags: ['venosa', 'urgência', 'piora', 'sistêmico', 'dor'],
-    guidance: {
-      rapid: 'Pergunte se os sintomas pioraram rapidamente e avalie a dor em relação aos achados. Use o protocolo local se houver suspeita de acometimento grave.',
-    },
   },
   {
     id: 'cofen-registro', type: 'general', organization: 'Cofen', year: 2025,
@@ -97,10 +88,7 @@ export const PROTOCOLS = [
     text: 'O registro da avaliação de uma lesão inclui etiologia, tipo de tecido, achados relacionados à infecção ou inflamação, exsudato, bordas e condição da pele ao redor.',
     tags: ['história', 'avaliação', 'tecido', 'exsudato', 'bordas', 'pele'],
     guidance: {
-      duration: 'Registre quando a lesão foi percebida e a evolução desde então.',
       wound: 'Inspecione a região e a pele ao redor e registre se há alteração objetiva no exame.',
-      etiology: 'Use a história e os achados clínicos para registrar a provável causa da lesão quando houver dados suficientes.',
-      diabetes: 'Verifique a história clínica e o prontuário disponíveis e registre se o diagnóstico de diabetes foi informado ou documentado.',
       depth: 'Registre os tecidos reconhecidos durante a avaliação. Se a extensão estiver encoberta, indique a limitação do exame.',
       purulence: 'Observe diretamente o exsudato e registre sua aparência. Use esta pergunta para registrar se a secreção purulenta foi confirmada.',
       erythema: 'Observe a pele ao redor e registre a extensão da vermelhidão em relação às bordas, quando for possível aferi-la.',
@@ -113,9 +101,7 @@ export const PROTOCOLS = [
     text: 'A avaliação de risco considera história, evolução, sinais vitais, alterações do estado mental e possíveis focos de infecção. Alterações no sítio cirúrgico incluem vermelhidão, edema, secreção ou abertura da ferida.',
     tags: ['febre', 'sistêmico', 'piora', 'urgência', 'sinais', 'temperatura'],
     guidance: {
-      fever: 'Pergunte se houve febre e verifique a temperatura medida, quando disponível. Registre o contexto e considere os demais sinais clínicos.',
-      systemic: 'Avalie sinais vitais, estado mental e evolução. Use o protocolo local diante de sinais sistêmicos preocupantes.',
-      rapid: 'Compare com avaliações anteriores e registre piora recente ou rápida. Avalie os sinais clínicos que possam exigir atendimento urgente.',
+      alerts: 'Verifique os sinais vitais, a evolução da lesão, o estado mental e a temperatura, quando disponível. Diante de sinais preocupantes, consulte o protocolo local.',
       incisionOpening: 'Inspecione a incisão e registre se houve abertura da ferida, além de alterações de cor, edema ou secreção quando presentes.',
     },
   },
@@ -125,9 +111,7 @@ export const PROTOCOLS = [
     text: 'Na avaliação de inflamação da pele, considere causas alternativas, como eczema, insuficiência venosa crônica ou reação inflamatória. Observe a extensão da vermelhidão, do edema e a evolução da dor.',
     tags: ['calor', 'edema', 'dor', 'eritema', 'pele'],
     guidance: {
-      warmth: 'Compare a temperatura da pele ao redor com regiões adjacentes e registre o aumento de calor percebido no exame.',
-      pain: 'Pergunte sobre início e evolução da dor. Registre se houve aumento ou dor desproporcional aos achados observados.',
-      swelling: 'Observe se há edema ao redor da região e se ele se estende além da área inicialmente afetada.',
+      localInflammation: 'Observe se há calor, dor nova ou crescente e edema ou endurecimento. Compare com a região ao redor e com o quadro anterior, quando conhecido.',
     },
   },
   ...TREATMENT_SOURCES,

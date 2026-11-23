@@ -1,4 +1,4 @@
-import { QUESTIONS, TYPES, VISUAL_REVIEW, questionsFor } from '../web/app/domain.mjs';
+import { QUESTIONS, TYPES, questionsFor } from '../web/app/domain.mjs';
 import { draftReport } from './assessment.mjs';
 import { ApiError, DEFAULT_MODEL, analyzeImage, analyzeWithWillie, checkedVision } from './providers.mjs';
 
@@ -13,13 +13,13 @@ function checkedCase(payload) {
   const vision = payload.vision == null ? null : checkedVision(payload.vision, 400);
   const type = payload.type;
   const findings = vision?.findings ?? [];
-  const visualReview = payload.visualReview ?? {};
-  if (!visualReview || typeof visualReview !== 'object' || Array.isArray(visualReview) ||
-      Object.entries(visualReview).some(([key, value]) => !findings.includes(key) || !Object.hasOwn(VISUAL_REVIEW, value))) {
-    throw new ApiError(400, 'Há uma revisão de achado visual inválida.');
+  const { etiology } = payload.exam;
+  if (etiology !== undefined && !['diabetic', 'pressure', 'surgical', 'venous', 'unknown'].includes(etiology)) {
+    throw new ApiError(400, 'Roteiro de exame inválido.');
   }
-  const exam = {};
+  const exam = etiology === undefined ? {} : { etiology };
   for (const [key, value] of Object.entries(payload.exam)) {
+    if (key === 'etiology') continue;
     if (!questionById.get(key)?.options.some(([id]) => id === value)) {
       throw new ApiError(400, 'Há uma resposta de exame inválida.');
     }
@@ -30,8 +30,11 @@ function checkedCase(payload) {
     throw new ApiError(400, 'Responda às perguntas ou marque quando um achado não foi avaliado.');
   }
   return {
-    type, vision, findings, visualReview,
-    exam: Object.fromEntries(activeQuestions.map(({ id }) => [id, exam[id]])),
+    type, vision, findings,
+    exam: {
+      ...Object.fromEntries(activeQuestions.map(({ id }) => [id, exam[id]])),
+      ...(etiology === undefined ? {} : { etiology }),
+    },
   };
 }
 

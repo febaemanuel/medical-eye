@@ -20,7 +20,7 @@ O WILLIE usa um checkpoint oficial do MINI com os decodificadores de classifica�
 
 ## Exame e resumo
 
-O profissional pode corrigir a etiologia e mudar o roteiro. Os achados visuais abrem ou priorizam perguntas, como extensão do eritema ou presença de secreção purulenta. Cada sugestão visual tem revisão própria. Os campos clínicos registram as informações usadas para a hipótese, o estadiamento quando aplicável, a avaliação de infecção e a seleção dos tópicos de tratamento.
+O profissional pode corrigir a etiologia e mudar o roteiro. Os achados visuais abrem ou priorizam perguntas, como extensão do eritema ou presença de secreção purulenta. As sugestões da foto são exibidas para consulta. O roteiro abre perguntas adicionais quando as respostas clínicas indicam que elas ajudam a avaliar a gravidade. Os campos clínicos registram as informações usadas para a hipótese, o estadiamento quando aplicável, a avaliação de infecção e a seleção dos tópicos de tratamento.
 
 O servidor seleciona as orientações e evidências a partir do contexto registrado, com vínculo por assunto e com busca textual para as fontes complementares. O resumo indica os dados que ainda faltam para decidir opções como descarga de pressão ou compressão. As recomendações e as sínteses são vinculadas à publicação, como apoio à avaliação e à discussão com a equipe.
 

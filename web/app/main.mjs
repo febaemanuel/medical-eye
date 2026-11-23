@@ -6,7 +6,7 @@ const el = id => document.getElementById(id);
 const state = {
   page: 'assessment', step: 0, maxStep: 0, photo: null, photoUrl: null, authorized: false,
   cloudAuthorized: false, config: null, configError: false, type: null, vision: null, exam: {}, report: null,
-  analyzed: false, maskUrl: null, visualReview: {}, willieError: null, visionError: null,
+  analyzed: false, maskUrl: null, willieError: null, visionError: null,
   pending: '', error: '', install: null, camera: null,
 };
 
@@ -82,7 +82,7 @@ function clearPhoto() {
   if (state.maskUrl) URL.revokeObjectURL(state.maskUrl);
   Object.assign(state, {
     photo: null, photoUrl: null, type: null, vision: null, maskUrl: null, analyzed: false,
-    willieError: null, visionError: null, visualReview: {}, exam: {}, report: null, maxStep: 0,
+    willieError: null, visionError: null, exam: {}, report: null, maxStep: 0,
   });
 }
 
@@ -136,7 +136,7 @@ async function analyze(retry = false) {
       if (state.maskUrl) URL.revokeObjectURL(state.maskUrl);
       Object.assign(state, { type, maskUrl, willieError });
     }
-    if (target !== 'willie') Object.assign(state, { vision, visionError, visualReview: {} });
+    if (target !== 'willie') Object.assign(state, { vision, visionError });
     Object.assign(state, { analyzed: true, report: null, maxStep: retry ? Math.min(state.maxStep, 2) : 1, pending: '' });
     goTo(1);
     announce('Análise concluída. Revise os achados.');
@@ -156,7 +156,7 @@ async function generate() {
   try {
     state.report = await fetchJson('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ authorized: state.authorized, type: state.type, vision: state.vision, visualReview: state.visualReview, exam: state.exam }),
+      body: JSON.stringify({ authorized: state.authorized, type: state.type, vision: state.vision, exam: state.exam }),
     });
     state.pending = '';
     goTo(3);
@@ -274,29 +274,31 @@ document.addEventListener('change', event => {
   }
   if (input.id === 'cloud-consent') state.cloudAuthorized = input.checked;
   if (input.id === 'mask-toggle') el('wound-mask').hidden = !input.checked;
-  if (input.dataset.visual && input.type === 'radio') {
-    state.visualReview[input.dataset.visual] = input.value;
+  if (input.id === 'exam-route') {
+    if (input.value) state.exam.etiology = input.value;
+    else delete state.exam.etiology;
     state.report = null;
-    state.maxStep = Math.min(state.maxStep, 2);
+    state.maxStep = 2;
+    render();
+    el('exam-route').focus({ preventScroll: true });
   }
   if (input.form?.id === 'exam-form' && input.type === 'radio') {
+    const findings = state.vision?.findings ?? [];
+    const previous = questionsFor(state.type, findings, state.exam);
     const hasPriorReport = Boolean(state.report);
     state.exam[input.name] = input.value;
     state.report = null;
     state.maxStep = 2;
-    let selected = input;
-    if (['etiology', 'wound'].includes(input.name) || hasPriorReport) {
+    const current = questionsFor(state.type, findings, state.exam);
+    const questionsChanged = current.length !== previous.length ||
+      current.some(({ id }, index) => id !== previous[index]?.id);
+    if (questionsChanged || hasPriorReport) {
       const selection = `input[name="${input.name}"][value="${input.value}"]`;
       render();
-      selected = document.querySelector(selection);
-      selected?.focus({ preventScroll: true });
+      document.querySelector(selection)?.focus({ preventScroll: true });
     } else {
-      el('urgent').innerHTML = urgencyNotice(state.exam);
+      el('urgent').innerHTML = urgencyNotice(state.exam, state.type);
       updateExamStatus();
-    }
-    if (input.value === 'unknown') {
-      const guidance = selected?.closest('fieldset')?.querySelector('.question-help');
-      if (guidance) guidance.open = true;
     }
   }
 });

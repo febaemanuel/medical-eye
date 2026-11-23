@@ -14,10 +14,9 @@ import { renderLibraryResults, renderView } from '../web/app/views.mjs';
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x10, 0xff, 0xd9]);
 const vision = { quality: 'adequate', findings: ['yellow', 'redness'], description: 'Material amarelado e área avermelhada.' };
 const exam = {
-  wound: 'yes', etiology: 'diabetic', diabetes: 'yes', footLocation: 'yes', fever: 'no',
-  duration: 'days', plantar: 'yes', neuropathy: 'yes', footPerfusion: 'unknown',
-  purulence: 'yes', erythema: 'localized', depth: 'skin', warmth: 'yes', pain: 'no',
-  swelling: 'no', systemic: 'no', rapid: 'no', alternative: 'excluded', sirs: 'zero', deepInfection: 'no',
+  wound: 'yes', diabeticContext: 'yes', alerts: 'none', footPerfusion: 'unknown',
+  purulence: 'yes', erythema: 'localized', depth: 'skin', localInflammation: 'one',
+  alternative: 'excluded', sirs: 'zero', deepInfection: 'no',
 };
 
 async function listen(server) {
@@ -27,38 +26,57 @@ async function listen(server) {
 }
 
 test('estágio e gravidade exigem os dados clínicos correspondentes', () => {
-  assert.match(clinicalAssessment(exam).infection, /^Leve/);
-  assert.equal(clinicalAssessment({ ...exam, etiology: 'unknown' }).stage, 'Dados insuficientes');
-  assert.equal(clinicalAssessment({ ...exam, depth: 'deep', deepInfection: 'unknown' }).infection, 'Dados insuficientes');
-  assert.equal(clinicalAssessment({ ...exam, fever: 'yes' }).infection, 'Dados insuficientes');
-  assert.doesNotMatch(clinicalAssessment({ ...exam, diabetes: 'no' }).infection, /IWGDF/);
-  assert.match(clinicalAssessment({ ...exam, deepInfection: 'yes' }).infection, /^Moderada/);
-  assert.match(clinicalAssessment({ ...exam, sirs: 'multiple' }).infection, /^Grave/);
-  const pressure = { wound: 'yes', etiology: 'pressure', pressureExposure: 'yes', depth: 'skin', pressureTissue: 'stage2' };
-  assert.equal(clinicalAssessment(pressure).stage, 'Estágio 2');
-  assert.equal(clinicalAssessment({ ...pressure, depth: 'obscured' }).stage, 'Dados insuficientes');
-  assert.equal(clinicalAssessment({ ...pressure, pressureExposure: 'unknown' }).stage, 'Dados insuficientes');
-  assert.equal(clinicalAssessment({ wound: 'no', systemic: 'yes' }).urgency, true);
+  const assess = (answers = {}) => clinicalAssessment({ ...exam, ...answers }, 'diabetic');
+  assert.match(assess().infection, /^Leve/);
+  assert.equal(assess({ etiology: 'unknown' }).stage, 'Dados insuficientes');
+  assert.equal(assess({ depth: 'deep', deepInfection: 'unknown' }).infection, 'Dados insuficientes');
+  assert.equal(assess({ alerts: 'fever' }).infection, 'Dados insuficientes');
+  assert.doesNotMatch(assess({ diabeticContext: 'no' }).infection, /IWGDF/);
+  assert.match(assess({ deepInfection: 'yes' }).infection, /^Moderada/);
+  assert.match(assess({ sirs: 'multiple' }).infection, /^Grave/);
+  const negative = { purulence: 'no', erythema: 'none', localInflammation: 'none', sirs: undefined, deepInfection: undefined };
+  assert.match(assess(negative).infection, /IWGDF\/IDSA 1/);
+  assert.equal(assess({ ...negative, localInflammation: 'unknown' }).infection, 'Dados insuficientes');
+  const pressure = { wound: 'yes', pressureExposure: 'yes', pressureTissue: 'stage2' };
+  assert.equal(clinicalAssessment(pressure, 'pressure').stage, 'Estágio 2');
+  assert.equal(clinicalAssessment({ ...pressure, pressureTissue: 'unknown' }, 'pressure').stage, 'Dados insuficientes');
+  assert.equal(clinicalAssessment({ ...pressure, pressureExposure: 'unknown' }, 'pressure').stage, 'Dados insuficientes');
+  assert.equal(clinicalAssessment({ wound: 'no', alerts: 'urgent' }).urgency, true);
 });
 
-test('tipo e achados indicam as perguntas iniciais e o exame pode corrigir o contexto', () => {
-  for (const [type, id] of Object.entries({
-    diabetic: 'footLocation', pressure: 'pressureTissue', surgical: 'incisionOpening', venous: 'venousHistory',
-  })) {
-    const questions = questionsFor(type, vision.findings);
-    assert.ok(questions.some(question => question.id === id));
-    assert.ok(questions.some(question => question.id === 'diabetes'));
-    assert.ok(questions.some(question => question.id === 'fever'));
-  }
-  const questions = questionsFor('diabetic', vision.findings, exam);
-  assert.ok(questions.find(q => q.id === 'purulence').fromImage);
-  assert.ok(questions.findIndex(q => q.id === 'purulence') < questions.findIndex(q => q.id === 'depth'));
-  assert.deepEqual(questionsFor('pressure', [], { wound: 'no' }).map(q => q.id),
-    ['wound', 'diabetes', 'fever', 'systemic', 'rapid']);
-  assert.ok(questionsFor('no_wound', []).some(q => q.id === 'wound'));
-  const corrected = questionsFor('diabetic', vision.findings, { ...exam, etiology: 'surgical' });
-  assert.ok(corrected.some(q => q.id === 'surgerySite'));
-  assert.ok(corrected.every(q => q.id !== 'footLocation'));
+test('tipo e foto selecionam perguntas essenciais sem duplicar as avaliações visuais', () => {
+  const ids = (type, findings = [], answers = {}) => questionsFor(type, findings, answers).map(q => q.id);
+  const diabetic = ids('diabetic', ['surface_loss', 'yellow', 'redness', 'dark']);
+  assert.equal(diabetic.length, 8);
+  assert.equal(diabetic.filter(id => id === 'depth').length, 1);
+  assert.ok(diabetic.indexOf('purulence') < diabetic.indexOf('footPerfusion'));
+  assert.ok(diabetic.includes('alerts'));
+  assert.ok(!diabetic.includes('sirs'));
+
+  const pressure = ids('pressure', ['surface_loss', 'dark']);
+  assert.equal(pressure.length, 5);
+  assert.ok(pressure.includes('pressureTissue'));
+  assert.ok(!pressure.includes('depth'));
+  assert.ok(ids('venous', ['redness']).includes('erythema'));
+  assert.ok(!ids('venous').includes('erythema'));
+  assert.ok(ids('venous', ['swelling']).includes('localInflammation'));
+
+  const complex = ids('diabetic', [], exam);
+  assert.ok(['alternative', 'deepInfection', 'sirs'].every(id => complex.includes(id)));
+  assert.ok(!ids('diabetic', [], { diabeticContext: 'no' }).includes('footPerfusion'));
+  assert.deepEqual(ids('pressure', [], { wound: 'no' }), ['wound', 'alerts']);
+  assert.ok(ids('no_wound').includes('wound'));
+
+  const corrected = ids('diabetic', vision.findings, { ...exam, etiology: 'surgical', incisionOpening: 'yes' });
+  assert.ok(corrected.includes('surgerySite'));
+  assert.ok(corrected.includes('depth'));
+  assert.ok(!corrected.includes('diabeticContext'));
+  assert.ok(!ids('diabetic', [], { etiology: 'unknown' }).includes('diabeticContext'));
+
+  const findings = renderView({ page: 'assessment', step: 1, maxStep: 1, type: 'diabetic', vision });
+  assert.match(findings, /Achados sugeridos pelo Gemini/);
+  assert.match(findings, /Material amarelado/);
+  assert.doesNotMatch(findings, /type="radio"|Confirmado no exame/);
 });
 
 test('referências consultadas usam a pergunta e o contexto clínico', () => {
@@ -134,19 +152,19 @@ test('uma chamada analisa o JPEG e as referências e o resumo são produzidos lo
 
   const report = await fetch(appUrl + '/api/report', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ authorized: true, ...analysis, visualReview: { yellow: 'absent' }, exam: { ...exam, erythema: 'unknown' } }),
+    body: JSON.stringify({ authorized: true, ...analysis, exam: { ...exam, erythema: 'unknown' } }),
   });
   assert.equal(report.status, 200);
   const summary = await report.json();
   assert.deepEqual(summary.pending.find(item => item.refs.includes('iwgdf-exame')), {
     question: 'Até onde vai a vermelhidão a partir da borda?', answer: 'Não aferido', refs: ['iwgdf-exame'],
   });
-  assert.ok(summary.examination.some(item => item.question.includes('diagnóstico de diabetes') && item.answer === 'Sim'));
+  assert.ok(summary.examination.some(item => item.question.includes('pessoa com diabetes') && item.answer === 'Sim'));
   assert.equal(summary.infection.text, 'Dados insuficientes');
   assert.ok(summary.references.some(ref => ref.id === 'iwgdf-exame'));
   assert.ok(summary.references.some(ref => ref.id === 'lazzarini-descarga'));
   assert.match(summary.treatment.find(item => item.refs.includes('iwgdf-perfusao')).text, /avaliação vascular/);
-  assert.ok(summary.visualReview.some(item => item.status === 'Ausente no exame'));
+  assert.equal(Object.hasOwn(summary, 'visualReview'), false);
   assert.equal(requests.length, 1);
 
   result = { ...result, quality: 'poor' };
