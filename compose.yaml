@@ -1,0 +1,36 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-4310}:4310"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4310
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      VISION_MODEL: ${VISION_MODEL:-gemini-3.8-flash}
+      REPORT_MODEL: ${REPORT_MODEL:-gemini-3.8-flash}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-}
+      WILLIE_URL: http://willie:8765/classify
+      WILLIE_TOKEN: ${WILLIE_TOKEN:-}
+    depends_on:
+      willie:
+        condition: service_healthy
+
+  willie:
+    build: ./willie
+    restart: unless-stopped
+    environment:
+      WILLIE_THREADS: ${WILLIE_THREADS:-4}
+      WILLIE_TOKEN: ${WILLIE_TOKEN:-}
+    volumes:
+      - willie-models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health', timeout=2)"]
+      interval: 10s
+      timeout: 4s
+      retries: 4
+      start_period: 8m
+
+volumes:
+  willie-models:
