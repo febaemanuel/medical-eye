@@ -3,80 +3,39 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f5f8f8" />
-    <meta
-      name="description"
-      content="Avaliação guiada de feridas para profissionais, internos e estudantes de saúde."
-    />
+    <meta name="theme-color" content="#f1f4f6" />
+    <meta name="description" content="Ficha de avaliação de feridas para profissionais, internos e estudantes de saúde." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Medical Eye</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <link rel="stylesheet" href="/styles.css" />
-    <script type="module" src="/app/main.mjs"></script>
+    <link rel="stylesheet" href="/assets/3/styles.css" />
+    <script type="module" src="/assets/3/app/main.mjs"></script>
   </head>
   <body>
     <a class="skip" href="#main">Ir para o conteúdo</a>
-    <div class="shell">
-      <aside class="sidebar" aria-label="Navegação principal">
-        <button
-          class="brand"
-          data-view="assessment"
-          aria-label="Medical Eye, avaliação"
-        >
+    <header class="topbar">
+      <div class="topbar-content">
+        <button class="brand" data-view="assessment" aria-label="Medical Eye, avaliação">
           <span class="brand-mark" data-icon="brand"></span>
-          <span
-            ><strong>Medical Eye</strong
-            ><small>Apoio à avaliação clínica</small></span
-          >
+          <strong>Medical Eye</strong>
         </button>
-        <nav class="nav">
-          <button data-view="assessment" aria-current="page">
-            <span data-icon="clipboard"></span> Avaliação
-          </button>
-          <button data-view="library">
-            <span data-icon="book"></span> Protocolos
-          </button>
-          <button data-view="about">
-            <span data-icon="info"></span> Sobre o app
-          </button>
+        <nav class="nav" aria-label="Navegação principal">
+          <button data-view="assessment" aria-current="page">Avaliação</button>
+          <button data-view="library">Referências</button>
+          <button data-view="about">Sobre</button>
         </nav>
-        <div class="sidebar-footer">
-          <div class="academic">
-            <span data-icon="cap"></span>
-            <div>
-              <strong>Ambiente acadêmico</strong
-              ><small>Profissionais e estudantes</small>
-            </div>
-          </div>
-        </div>
-      </aside>
-      <div class="workspace">
-        <header class="topbar">
-          <div class="breadcrumb">
-            <span data-icon="grid"></span><span>Área de trabalho</span
-            ><span data-icon="chevron"></span
-            ><strong id="crumb">Avaliação</strong>
-          </div>
-          <button class="btn install" id="install">
-            <span data-icon="download"></span><span>Instalar aplicativo</span>
-          </button>
-        </header>
-        <main id="main" tabindex="-1">
-          <div id="app"></div>
-          <noscript
-            ><p>Ative o JavaScript para usar a avaliação guiada.</p></noscript
-          >
-        </main>
+        <button class="btn install" id="install" aria-label="Instalar aplicativo">
+          <span data-icon="download"></span><span>Instalar</span>
+        </button>
       </div>
-    </div>
-    <div
-      class="sr-only"
-      id="announcement"
-      role="status"
-      aria-live="polite"
-    ></div>
+    </header>
+    <main id="main" tabindex="-1">
+      <div id="app"></div>
+      <noscript><p>Ative o JavaScript para usar a avaliação guiada.</p></noscript>
+    </main>
+    <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
     <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
   </body>
 </html>

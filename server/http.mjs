@@ -55,7 +55,7 @@ export function createAppServer(config = process.env) {
         response.writeHead(405).end();
         return;
       }
-      const path = url.pathname === '/' ? '/index.html' : url.pathname;
+      const path = url.pathname === '/' ? '/index.html' : url.pathname.replace(/^\/assets\/\d+(?=\/)/, '');
       if (!/^\/[A-Za-z0-9_.\-/]+$/.test(path) || path.includes('..') || !types[extname(path)]) {
         response.writeHead(404).end();
         return;

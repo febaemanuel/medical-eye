@@ -1,43 +1,42 @@
 # Medical Eye
 
-Aplicativo web instalável de apoio à avaliação de feridas. Foi pensado para profissionais de saúde, internos e estudantes.
+Ficha web instalável para registro e revisão profissional da avaliação de feridas.
 
-O caso começa com uma foto tirada pelo app ou selecionada na galeria. O WILLIE MINI sugere uma das cinco classes (`diabetic`, `pressure`, `surgical`, `venous` e `no_wound`), e o Gemini de visão descreve o que é possível observar. A equipe registra os achados do exame e revisa o parecer preliminar, que traz hipótese, estágio, gravidade da infecção, conduta sugerida e fontes. O app indica quando faltam dados para classificar.
+1. Capture ou selecione a foto. Uma chamada ao Gemini devolve o tipo sugerido e os achados visuais.
+2. Preencha a consulta e o exame. As perguntas mudam conforme o tipo sugerido e o contexto clínico registrado. O botão **Consultar orientação** mostra uma síntese da seção pertinente de uma diretriz.
+3. Revise o resumo com a hipótese clínica, os achados registrados, as pendências e as referências recuperadas na base local.
 
-O WILLIE é um modelo de pesquisa. O uso assistencial depende de validação clínica e institucional. [Repositório oficial](https://github.com/Qian-Group-HRI/Willie) · [Pesos e limitações](https://huggingface.co/QianGroup/willie-weights)
+O tipo da foto é uma hipótese visual. O resumo considera história e exame, com critérios aplicáveis de estágio ou gravidade quando há dados suficientes. O uso assistencial exige validação clínica e institucional.
 
 ## Rodar no computador
 
-Você precisa de Docker com Compose e de uma chave Gemini. Copie o exemplo e preencha `GEMINI_API_KEY` no `.env`.
+Com Docker e Compose, copie o exemplo e preencha `GEMINI_API_KEY` no `.env`. Para uma instalação existente, preserve seu `.env`.
 
 ```bash
 cp .env.example .env
 docker compose up --build -d
 ```
 
-Abra [localhost:4310](http://localhost:4310). Na primeira execução, o classificador baixa cerca de 410 MB de pesos oficiais para o volume `willie-models`. O app fica disponível depois que o classificador carrega.
+No PowerShell, use `Copy-Item .env.example .env` para criar o arquivo pela primeira vez. Abra [localhost:4310](http://localhost:4310). O serviço principal usa `gemini-3.8-flash` por padrão e pode ser configurado com `VISION_MODEL`.
 
-Use `docker compose ps` para ver se os serviços subiram e `docker compose logs -f willie web` para acompanhar a inicialização. Para encerrar, use `docker compose down`.
+```bash
+docker compose ps
+docker compose logs -f web
+```
 
-O modelo padrão é `gemini-3.8-flash`. As opções `VISION_MODEL` e `REPORT_MODEL` permitem escolher modelos diferentes para a foto e o parecer. [Documentação de imagens](https://ai.google.dev/gemini-api/docs/image-understanding) · [Saída em JSON](https://ai.google.dev/gemini-api/docs/structured-output)
+## Instalar no celular
 
-## Instalar como aplicativo
+Sirva a aplicação na raiz de um domínio HTTPS com acesso restrito à equipe. No Android ou no Chromium, use **Instalar**. No iPhone e no iPad, use **Compartilhar → Adicionar à Tela de Início** no Safari.
 
-- Android e desktop Chromium. Use **Instalar aplicativo** no app ou no menu do navegador.
-- iPhone e iPad. No Safari, use **Compartilhar → Adicionar à Tela de Início**.
+## Código e testes
 
-Para acessar pelo celular, sirva a aplicação na raiz de um domínio HTTPS com acesso restrito à equipe. O navegador pode guardar a interface e a biblioteca de protocolos para consulta, e as análises precisam de conexão.
-
-## Código e documentação
-
-| Pasta | O que tem |
+| Pasta | Conteúdo |
 | --- | --- |
-| `web/` | Interface, câmera, formulários, manifesto e base de protocolos |
-| `server/` | API Node, integração com o Gemini e busca de referências |
-| `willie/` | Serviço Python do classificador e download dos pesos |
-| `tests/` | Testes da API, do exame e dos arquivos da PWA |
-| `docs/` | Configuração, arquitetura e tratamento dos dados |
+| `web/` | Ficha, captura, perguntas, fontes locais e shell da PWA |
+| `server/` | API Node, análise com Gemini e geração do resumo a partir do exame |
+| `willie/` | Serviço opcional para pesquisa e comparação de classificadores |
+| `tests/` | Testes da API, referências clínicas, exame e PWA |
 
-Execute `npm test` com Node.js 22 ou superior. Os testes usam respostas controladas no lugar das chamadas aos provedores.
+Execute `npm test` com Node.js 22 ou superior. O teste de integração conta as chamadas ao provedor usando respostas controladas.
 
 [Arquitetura e fluxo de dados](docs/arquitetura.md) · [Configuração e publicação](docs/configuracao.md)

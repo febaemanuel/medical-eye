@@ -1,50 +1,37 @@
 # Configuração e publicação
 
-## Sem Docker
+## Rodar com Node.js
 
-Use Python 3.12, Node.js 22 ou superior e um ambiente virtual. No PowerShell, use `.venv\Scripts\python.exe` no lugar de `.venv/bin/python`.
-
-```bash
-python -m venv .venv
-.venv/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1+cpu'
-.venv/bin/python -m pip install -r willie/requirements.txt
-.venv/bin/python willie/scripts/fetch_models.py
-.venv/bin/python -m uvicorn --app-dir willie service:app --host 127.0.0.1 --port 8765 --no-access-log
-```
-
-Em outro terminal, copie o exemplo e configure a credencial Gemini.
+Use a versão 22 ou superior. Copie o exemplo, preencha a chave no arquivo e inicie o servidor.
 
 ```bash
 cp .env.example .env
 npm start
 ```
 
-## Configuração do servidor
+## Configuração
 
 | Variável | Uso |
 | --- | --- |
-| `GEMINI_API_KEY` | Chave da conta que fará as chamadas de visão e parecer |
-| `VISION_MODEL` e `REPORT_MODEL` | Identificadores Gemini disponíveis na conta |
-| `GEMINI_BASE_URL` | URL HTTPS de um gateway próprio que implemente o mesmo contrato Gemini REST. O padrão é a API oficial |
-| `WILLIE_URL` | Endpoint interno do classificador. O Compose configura `http://willie:8765/classify` |
-| `WILLIE_TOKEN` | Token opcional entre a API e o classificador. Use o mesmo valor nos dois serviços |
-| `WILLIE_THREADS` | Número de threads do PyTorch no serviço. Padrão 4 |
-| `WILLIE_MODEL_DIR` | Pasta de pesos e código DINOv2 no serviço Python. Padrão local `.cache/willie` |
+| `GEMINI_API_KEY` | Chave usada para analisar a foto |
+| `VISION_MODEL` | Modelo Gemini que devolve classificação sugerida e achados em JSON |
+| `GEMINI_BASE_URL` | Gateway com contrato Gemini REST, quando necessário. A API oficial é o padrão |
 | `HOST` e `PORT` | Endereço e porta do Node em execução direta. Padrão `127.0.0.1:4310` |
 
-No Compose, `PORT` é a porta publicada em loopback no host. Para o celular, configure o proxy HTTPS para encaminhar a raiz do domínio a essa porta. Controle o acesso ao domínio pelo provedor de identidade ou pela rede privada da instituição. Mantenha o WILLIE em rede interna e configure chaves no ambiente ou no gerenciador de segredos do servidor. Duas chamadas externas são feitas por avaliação completa.
+No Compose, `PORT` define a porta publicada em loopback. Para acesso de outros dispositivos, encaminhe a raiz do domínio HTTPS para essa porta. Restrinja o acesso pelo provedor de identidade ou pela rede privada da instituição.
 
 ## Verificar a instalação
 
-- Confira se o WILLIE fica saudável com `docker compose ps`. Os logs do serviço mostram as etapas de download e inicialização.
-- Abra `/api/config`. `configured: true` indica que o endpoint e a chave estão definidos. A validade da credencial é verificada pela primeira chamada real.
-- Para o teste técnico inicial, use uma imagem que você está autorizado a processar. Veja o retorno do WILLIE e do Gemini, preencha o exame e confira as referências do parecer.
-- Instale a PWA pelo navegador do dispositivo que será usado. Verifique a câmera e as permissões nesse dispositivo.
+- Acesse `/api/config`. `configured: true` indica que a chave está definida.
+- Teste com uma foto que você tem autorização para processar. Confira a classificação sugerida e os achados. Abra uma orientação, marque uma pendência e confirme se a fonte aparece no resumo.
+- Verifique a instalação da PWA e a câmera nos dispositivos de uso.
 
-Em caso de erro Gemini, confira a chave, o identificador de modelo disponível e a cota da conta. Para falha no WILLIE, consulte a saúde do contêiner, o espaço disponível no volume e a conectividade na etapa de download.
+## WILLIE para pesquisa
+
+O serviço Python do WILLIE está no perfil `research` do Compose. Use `docker compose --profile research up --build -d willie` para iniciá-lo como serviço interno. Os pesos MINI oficiais são baixados no primeiro início para o volume `willie-models`. Em instalações anteriores, o comando `docker compose --profile research stop willie` para esse serviço opcional e preserva o volume.
 
 ## Dados e uso assistencial
 
-O código do aplicativo mantém a foto e as respostas em memória. O service worker guarda somente arquivos públicos da interface e da base de referências. O app envia a foto e os achados aos serviços configurados conforme descrito na [arquitetura](arquitetura.md). Retenção e acesso no provedor externo e no proxy são definidos pelas respectivas configurações e contratos.
+A foto é enviada ao Gemini para a classificação sugerida e a leitura visual. O exame, a consulta às fontes e a geração do resumo ficam na aplicação. O service worker guarda apenas os arquivos da interface e a biblioteca de referências. A ficha fica em memória durante a sessão.
 
-Antes de processar fotos de pacientes, valide a autorização institucional para o fluxo de dados e a política aplicável ao provedor, revise o protocolo local e valide o modelo e o parecer para o cenário de uso. O WILLIE MINI é um modelo de pesquisa, e o resultado precisa de revisão pelo profissional responsável. [Model card do WILLIE](https://huggingface.co/QianGroup/willie-weights)
+Antes de processar fotos de pacientes, confirme a autorização institucional para o uso da API externa, as condições de retenção do provedor e a validação clínica do fluxo e das referências.

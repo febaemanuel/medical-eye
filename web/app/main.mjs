@@ -3,7 +3,6 @@ import { icon, svg } from './icons.mjs';
 import { renderView, urgencyNotice } from './views.mjs';
 
 const el = id => document.getElementById(id);
-const viewTitles = { assessment: 'Avaliação', library: 'Protocolos', about: 'Sobre o app' };
 const state = {
   page: 'assessment', step: 0, maxStep: 0, photo: null, photoUrl: null, authorized: false,
   config: null, configError: false, type: null, vision: null, exam: {}, report: null,
@@ -22,7 +21,6 @@ function updateExamStatus() {
 }
 
 function render() {
-  el('crumb').textContent = viewTitles[state.page];
   for (const button of document.querySelectorAll('.nav [data-view]')) {
     if (button.dataset.view === state.page) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
@@ -105,6 +103,10 @@ async function choosePhoto(file) {
 
 async function analyze() {
   if (!state.photo || !state.authorized || !state.config?.configured || state.pending) return;
+  if (state.vision) {
+    goTo(1);
+    return;
+  }
   state.pending = 'image';
   state.error = '';
   render();
@@ -113,7 +115,7 @@ async function analyze() {
     const result = await fetchJson('/api/analyze', {
       method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Image-Authorized': 'yes' }, body: state.photo,
     });
-    if (!Object.hasOwn(TYPES, result.type) || !result.vision) throw new Error('A análise retornou dados incompletos.');
+    if ((result.type !== null && !Object.hasOwn(TYPES, result.type)) || !result.vision) throw new Error('A análise retornou dados incompletos.');
     Object.assign(state, { ...result, exam: {}, report: null, maxStep: 1, pending: '' });
     goTo(1);
     announce('Análise concluída. Revise os achados.');
@@ -129,7 +131,7 @@ async function generate() {
   state.pending = 'report';
   state.error = '';
   render();
-  announce('Consultando protocolos e gerando o parecer.');
+  announce('Consultando referências e preparando o resumo.');
   try {
     state.report = await fetchJson('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -137,7 +139,7 @@ async function generate() {
     });
     state.pending = '';
     goTo(3);
-    announce('Parecer preliminar pronto para revisão.');
+    announce('Resumo pronto para revisão.');
   } catch (error) {
     state.pending = '';
     state.error = error.message;
@@ -245,7 +247,7 @@ document.addEventListener('change', event => {
   if (['camera-file', 'gallery-file'].includes(input.id)) void choosePhoto(input.files[0]);
   if (input.id === 'consent') {
     state.authorized = input.checked;
-    if (!state.authorized && state.type) {
+    if (!state.authorized && state.vision) {
       state.type = null;
       state.vision = null;
       state.exam = {};
@@ -263,13 +265,19 @@ document.addEventListener('change', event => {
     state.exam[input.name] = input.value;
     state.report = null;
     state.maxStep = 2;
+    let selected = input;
     if (['etiology', 'wound'].includes(input.name) || hasPriorReport) {
       const selection = `input[name="${input.name}"][value="${input.value}"]`;
       render();
-      document.querySelector(selection)?.focus({ preventScroll: true });
+      selected = document.querySelector(selection);
+      selected?.focus({ preventScroll: true });
     } else {
       el('urgent').innerHTML = urgencyNotice(state.exam);
       updateExamStatus();
+    }
+    if (input.value === 'unknown') {
+      const guidance = selected?.closest('fieldset')?.querySelector('.question-help');
+      if (guidance) guidance.open = true;
     }
   }
 });

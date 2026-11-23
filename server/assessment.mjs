@@ -1,5 +1,6 @@
 import { PROTOCOLS } from '../web/data/protocolos.mjs';
-import { TYPES, VISUAL, urgent } from '../web/app/domain.mjs';
+import { TYPES, VISUAL, confirmedType, questionScope, questionsFor, urgent } from '../web/app/domain.mjs';
+import { guidanceFor } from '../web/app/evidence.mjs';
 
 const normalize = value => value.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 const words = value => normalize(value).match(/[a-z][a-z0-9]{2,}/g) || [];
@@ -7,14 +8,13 @@ const words = value => normalize(value).match(/[a-z][a-z0-9]{2,}/g) || [];
 const signalTerms = {
   purulence: 'secreção purulência', erythema: 'vermelhidão eritema', depth: 'profundidade tecido',
   warmth: 'calor', pain: 'dor', swelling: 'edema', systemic: 'sistêmico urgência',
-  rapid: 'piora urgência', sirs: 'sistêmico sirs', pressureTissue: 'derme estágio pressão',
+  fever: 'febre temperatura', rapid: 'piora urgência', sirs: 'sistêmico sirs', pressureTissue: 'derme estágio pressão',
   deepInfection: 'infecção profundidade',
 };
 
 export function retrieve(caseData, corpus = PROTOCOLS) {
   const { type, findings, exam } = caseData;
-  if (exam.wound === 'no') return [];
-  const scope = exam.etiology && exam.etiology !== 'unknown' ? exam.etiology : type;
+  const scope = exam.wound === 'no' ? null : questionScope(type, exam);
   const terms = new Set(words([
     TYPES[scope] || '', ...findings.map(item => VISUAL[item] || ''),
     ...Object.entries(exam).filter(([, value]) => !['unknown', 'no', 'none', 'zero'].includes(value))
@@ -63,7 +63,7 @@ export function clinicalAssessment(exam) {
     return { stage: 'Sem lesão identificada ao exame', infection: 'Não avaliada neste fluxo', urgency };
   }
   const confirmed = exam.wound === 'yes';
-  const etiology = confirmed ? exam.etiology : undefined;
+  const etiology = confirmedType(exam);
   const stage = etiology === 'pressure'
     ? (pressureDepth[exam.pressureTissue]?.includes(exam.depth) ? pressureStages[exam.pressureTissue] : insufficient)
     : (hypothesisFor[etiology] ? 'Estadiamento específico não aplicado' : insufficient);
@@ -71,12 +71,12 @@ export function clinicalAssessment(exam) {
   let infection = insufficient;
 
   if (confirmed && etiology === 'diabetic') {
-    const assessedNegative = ['purulence', 'warmth', 'pain', 'swelling', 'systemic', 'rapid'].every(id => exam[id] === 'no') &&
+    const assessedNegative = ['purulence', 'warmth', 'pain', 'swelling', 'fever', 'systemic', 'rapid'].every(id => exam[id] === 'no') &&
       exam.erythema === 'none' && exam.sirs === 'zero' && exam.deepInfection === 'no';
     if (assessedNegative) infection = 'Sem sinais clínicos registrados · IWGDF/IDSA 1';
     if (signs >= 2 && exam.alternative === 'excluded') {
       if (exam.sirs === 'multiple') infection = 'Grave · IWGDF/IDSA 4';
-      if (exam.systemic === 'no' && ['zero', 'one'].includes(exam.sirs)) {
+      if (exam.systemic === 'no' && exam.fever === 'no' && ['zero', 'one'].includes(exam.sirs)) {
         if (exam.erythema === 'extended' || exam.deepInfection === 'yes') infection = 'Moderada · IWGDF/IDSA 3';
         else if (['none', 'trace', 'localized'].includes(exam.erythema) && exam.deepInfection === 'no') {
           infection = 'Leve · IWGDF/IDSA 2';
@@ -97,31 +97,62 @@ const conduct = {
   venous: ['Reavaliar os sinais de infecção e o manejo da etiologia da úlcera de perna.', 'nice-ulcera'],
 };
 
-export function draftReport(caseData, references, assessment = clinicalAssessment(caseData.exam)) {
-  const { exam, type } = caseData;
-  const ids = new Set(references.map(item => item.id));
-  const section = (text, ref) => ({ text, refs: ids.has(ref) ? [ref] : [] });
-  const scope = exam.wound === 'yes' ? exam.etiology : undefined;
+export function draftReport(caseData) {
+  const { exam, type, findings } = caseData;
+  const assessment = clinicalAssessment(exam);
+  const scope = confirmedType(exam);
+  const referencesById = new Map(retrieve(caseData).map(ref => [ref.id, ref]));
+  const appendReference = ref => {
+    if (ref) referencesById.set(ref.id, ref);
+  };
+  const section = (text, refId) => {
+    const ref = PROTOCOLS.find(item => item.id === refId);
+    appendReference(ref);
+    return { text, refs: ref ? [ref.id] : [] };
+  };
+
+  const examination = [];
+  const pending = [];
+  for (const question of questionsFor(type, findings, exam)) {
+    const answer = question.options.find(([value]) => value === exam[question.id])?.[1];
+    if (!answer) continue;
+    const entry = { question: question.label, answer };
+    if (exam[question.id] === 'unknown') {
+      const guidance = guidanceFor(question.id, type, exam);
+      appendReference(guidance?.reference);
+      pending.push({ ...entry, refs: guidance ? [guidance.reference.id] : [] });
+    } else {
+      examination.push(entry);
+    }
+  }
+
   const hypothesis = exam.wound === 'no'
     ? 'Nenhuma lesão identificada no exame registrado'
     : hypothesisFor[scope] || 'Hipótese indeterminada com os dados registrados';
-  const action = conduct[scope];
-  const firstSource = { diabetic: 'iwgdf-exame', pressure: 'anvisa-estagios', surgical: 'nice-incisao', venous: 'nice-ulcera' }[scope];
-  const sourceForUrgent = { diabetic: 'iwgdf-urgencia', venous: 'nice-ulcera-urgencia', surgical: 'nice-incisao' }[scope];
+  const firstSource = {
+    diabetic: 'iwgdf-exame', pressure: 'anvisa-estagios', surgical: 'nice-incisao', venous: 'nice-ulcera',
+  }[scope];
+  const sourceForUrgent = { diabetic: 'iwgdf-urgencia', venous: 'nice-ulcera-urgencia' }[scope] || 'nice-sinais';
   const suggestions = [];
-  if (assessment.urgency) suggestions.push(section('Priorizar avaliação presencial urgente e acionar o protocolo local conforme o exame.', sourceForUrgent));
-  if (action && ids.has(action[1])) suggestions.push(section(...action));
+  if (assessment.urgency) {
+    suggestions.push(section('Priorizar avaliação presencial urgente conforme o protocolo local.', sourceForUrgent));
+  } else if (exam.fever === 'yes') {
+    suggestions.push(section('Revisar a febre, a evolução clínica e os demais sinais sistêmicos conforme o protocolo local.', 'nice-sinais'));
+  }
+  if (conduct[scope]) suggestions.push(section(...conduct[scope]));
   if (!suggestions.length) suggestions.push(section('Rever a história e o exame antes de propor conduta específica.'));
-  return {
+
+  const report = {
     hypothesis: section(hypothesis, firstSource),
     stage: section(assessment.stage, scope === 'pressure' ? 'anvisa-estagios' : undefined),
     infection: section(assessment.infection, scope === 'pressure' ? undefined : firstSource),
     rationale: section(scope
-      ? 'A hipótese considera a etiologia registrada no exame. A leitura da foto serve para orientar perguntas.'
-      : type === 'no_wound' ? 'O resultado da imagem descreve o enquadramento e depende de confirmação no exame.'
-        : 'A hipótese depende da avaliação clínica da lesão e do seu contexto.', firstSource),
+      ? 'O resumo considera o contexto, a história e os achados registrados no exame.'
+      : 'O contexto clínico depende da confirmação da lesão, da história e dos achados do exame.', firstSource),
     suggestions,
+    examination,
+    pending,
     assessment,
-    references,
   };
+  return { ...report, references: [...referencesById.values()] };
 }

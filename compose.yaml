@@ -9,15 +9,10 @@ services:
       PORT: 4310
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       VISION_MODEL: ${VISION_MODEL:-gemini-3.8-flash}
-      REPORT_MODEL: ${REPORT_MODEL:-gemini-3.8-flash}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-}
-      WILLIE_URL: http://willie:8765/classify
-      WILLIE_TOKEN: ${WILLIE_TOKEN:-}
-    depends_on:
-      willie:
-        condition: service_healthy
 
   willie:
+    profiles: [research]
     build: ./willie
     restart: unless-stopped
     environment:
