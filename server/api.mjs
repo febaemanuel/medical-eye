@@ -57,10 +57,12 @@ export async function handleApi(request, config) {
       if (image.length > maxImageBytes) throw new ApiError(413, 'A imagem excede o limite de 4 MB.');
       if (image.length < 6 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff ||
           image.at(-2) !== 0xff || image.at(-1) !== 0xd9) throw new ApiError(400, 'O arquivo não é um JPEG válido.');
+      const target = request.headers.get('x-analysis-target') || 'both';
+      if (!['both', 'willie', 'gemini'].includes(target)) throw new ApiError(400, 'Serviço de análise inválido.');
       const cloudAllowed = request.headers.get('x-gemini-authorized') === 'yes' && configured(config);
       const [willie, gemini] = await Promise.allSettled([
-        analyzeWithWillie(image, config),
-        cloudAllowed ? analyzeImage(image, config) : Promise.resolve(null),
+        target !== 'gemini' ? analyzeWithWillie(image, config) : null,
+        cloudAllowed && target !== 'willie' ? analyzeImage(image, config) : null,
       ]);
       return Response.json({
         type: willie.value?.type ?? null,

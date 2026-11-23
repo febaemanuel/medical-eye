@@ -9,6 +9,17 @@ export class ApiError extends Error {
 
 export const DEFAULT_MODEL = 'gemini-3.8-flash';
 
+function networkCode(error) {
+  if (error?.name === 'TimeoutError') return 'TIMEOUT';
+  const code = error?.cause?.code;
+  return typeof code === 'string' && /^[A-Z0-9_]{1,64}$/.test(code) ? code : 'NETWORK';
+}
+
+function providerError(provider, detail, message) {
+  console.warn(`[${provider}] ${detail}`);
+  return new ApiError(502, message);
+}
+
 const qualities = ['adequate', 'limited', 'poor'];
 
 const imageSchema = {
@@ -60,8 +71,11 @@ export async function analyzeImage(image, config) {
       redirect: 'error',
       signal: AbortSignal.timeout(45000),
     });
-  } catch {
-    throw new ApiError(502, 'Gemini indisponível ou fora do tempo de resposta.');
+  } catch (error) {
+    const code = networkCode(error);
+    throw providerError('gemini', code, code === 'TIMEOUT'
+      ? 'O Gemini passou do tempo de resposta. Você pode tentar novamente.'
+      : `O servidor não conseguiu acessar o Gemini (${code}).`);
   }
 
   if (!response.ok) {
@@ -71,8 +85,13 @@ export async function analyzeImage(image, config) {
       403: 'Verifique a chave e a situação do projeto no Google AI Studio.',
       404: 'Verifique o identificador do modelo.',
       429: 'A cota do projeto foi atingida. Tente novamente mais tarde.',
+      500: 'O serviço do Google encontrou uma falha.',
+      502: 'O serviço do Google está temporariamente indisponível.',
+      503: 'O modelo está temporariamente indisponível. Tente novamente em instantes.',
+      504: 'O serviço do Google passou do tempo de resposta.',
     };
-    throw new ApiError(502, 'Gemini retornou erro. ' + (hints[response.status] || 'Tente novamente.'));
+    const status = `HTTP ${response.status}`;
+    throw providerError('gemini', status, `O Gemini retornou ${status}. ${hints[response.status] || 'Tente novamente.'}`);
   }
 
   let result;
@@ -82,27 +101,43 @@ export async function analyzeImage(image, config) {
       .map(part => part.text || '').join('');
     result = JSON.parse(text);
   } catch {
-    throw new ApiError(502, 'Gemini não retornou uma análise estruturada.');
+    throw providerError('gemini', 'INVALID_RESPONSE', 'Gemini não retornou uma análise estruturada.');
   }
 
   return checkedVision(result);
 }
 
 export async function analyzeWithWillie(image, config) {
+  const headers = { 'content-type': 'image/jpeg' };
+  if (config.WILLIE_TOKEN) headers.authorization = 'Bearer ' + config.WILLIE_TOKEN;
+  let response;
   try {
-    const headers = { 'content-type': 'image/jpeg' };
-    if (config.WILLIE_TOKEN) headers.authorization = 'Bearer ' + config.WILLIE_TOKEN;
     const url = new URL('/classify', config.WILLIE_URL || 'http://127.0.0.1:8765');
-    const response = await fetch(url, {
+    response = await fetch(url, {
       method: 'POST', headers, body: image, redirect: 'error', signal: AbortSignal.timeout(30000),
     });
-    if (!response.ok) throw new Error('WILLIE indisponível');
+  } catch (error) {
+    const code = networkCode(error);
+    throw providerError('willie', code, code === 'TIMEOUT'
+      ? 'O WILLIE passou de 30 segundos de processamento. Você pode tentar novamente.'
+      : `O servidor não conseguiu conectar ao WILLIE (${code}).`);
+  }
+
+  if (!response.ok) {
+    const status = `HTTP ${response.status}`;
+    const message = response.status === 400
+      ? 'Confira a resolução ou tire uma nova foto.'
+      : 'Confira os logs do serviço no Docker.';
+    throw providerError('willie', status, `O WILLIE retornou ${status}. ${message}`);
+  }
+
+  try {
     const result = await response.json();
     if (typeof result.class !== 'string' || !Object.hasOwn(TYPES, result.class)) throw new Error('Classe inválida');
     const mask = result.class !== 'no_wound' && typeof result.mask === 'string' && result.mask.length <= 100000 &&
       /^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(result.mask) ? result.mask : null;
     return { type: result.class, mask };
   } catch {
-    throw new ApiError(503, 'WILLIE ainda não está disponível. Confira o serviço ou prossiga com o exame manual.');
+    throw providerError('willie', 'INVALID_RESPONSE', 'WILLIE retornou uma análise em formato inválido.');
   }
 }

@@ -157,14 +157,27 @@ test('uma chamada analisa o JPEG e as referências e o resumo são produzidos lo
   willieStatus = 503;
   const manual = await (await analyze(authorization)).json();
   assert.equal(manual.type, null);
-  assert.match(manual.willieError, /WILLIE/);
+  assert.match(manual.willieError, /HTTP 503/);
 
   willieStatus = 200;
   geminiStatus = 429;
   const localFallback = await (await analyze(authorization)).json();
   assert.equal(localFallback.type, 'diabetic');
   assert.equal(localFallback.vision, null);
-  assert.match(localFallback.visionError, /cota/);
+  assert.match(localFallback.visionError, /HTTP 429.*cota/);
+
+  const cloudCount = requests.length;
+  const willieCount = localCalls.length;
+  const willieRetry = await (await analyze({ ...authorization, 'x-analysis-target': 'willie' })).json();
+  assert.equal(willieRetry.type, 'diabetic');
+  assert.equal(localCalls.length, willieCount + 1);
+  assert.equal(requests.length, cloudCount);
+
+  geminiStatus = 503;
+  const geminiRetry = await (await analyze({ ...authorization, 'x-analysis-target': 'gemini' })).json();
+  assert.match(geminiRetry.visionError, /HTTP 503.*temporariamente/);
+  assert.equal(localCalls.length, willieCount + 1);
+  assert.equal(requests.length, cloudCount + 1);
 });
 
 test('PWA serve o manifesto e todo o shell atualizado com a busca local', async t => {

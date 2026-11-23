@@ -118,6 +118,7 @@ function findingsScreen(state) {
     </div>
     ${state.willieError ? notice(state.willieError, 'warning') : ''}
     ${state.visionError ? notice(state.visionError + ' Você pode seguir com o exame.', 'warning') : ''}
+    ${state.error ? notice(state.error, 'danger') : ''}
     ${vision?.quality === 'poor' ? notice('Considere tirar outra foto. A leitura do WILLIE também deve ser revisada.', 'warning') : ''}
     ${state.type === 'no_wound' ? notice('O WILLIE marcou imagem sem ferida visível. Confira a pele no exame.') : ''}
     ${vision?.findings.length ? `<section class="visual-checklist" aria-label="Revisar achados sugeridos">
@@ -129,8 +130,12 @@ function findingsScreen(state) {
             ${state.visualReview[id] === value ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}</div>
       </fieldset>`).join('')}
     </section>` : ''}
-    <footer class="sheet-actions"><button class="btn" data-step="0">Voltar à foto</button>
-      <button class="btn primary" data-action="exam">Abrir exame</button></footer>`;
+    <footer class="sheet-actions"><button class="btn" data-step="0" ${state.pending ? 'disabled' : ''}>Voltar à foto</button>
+      <div class="actions">
+        ${state.willieError || state.visionError ? `<button class="btn" data-action="retry-analysis" ${state.pending || !state.authorized ? 'disabled' : ''}>
+          ${state.pending ? 'Analisando…' : 'Tentar análise novamente'}</button>` : ''}
+        <button class="btn primary" data-action="exam" ${state.pending ? 'disabled' : ''}>Abrir exame</button>
+      </div></footer>`;
 }
 
 export function urgencyNotice(exam) {

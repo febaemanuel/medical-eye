@@ -106,12 +106,13 @@ async function choosePhoto(file) {
   if (!state.error && state.authorized && state.config) await analyze();
 }
 
-async function analyze() {
+async function analyze(retry = false) {
   if (!state.photo || !state.authorized || state.pending) return;
-  if (state.analyzed) {
+  if (state.analyzed && !retry) {
     goTo(1);
     return;
   }
+  const target = retry && !state.willieError ? 'gemini' : retry && !state.visionError ? 'willie' : 'both';
   state.pending = 'image';
   state.error = '';
   render();
@@ -122,15 +123,21 @@ async function analyze() {
       headers: {
         'Content-Type': 'image/jpeg', 'X-Image-Authorized': 'yes',
         'X-Gemini-Authorized': state.cloudAuthorized ? 'yes' : 'no',
+        'X-Analysis-Target': target,
       },
       body: state.photo,
     });
     if (result.type !== null && !Object.hasOwn(TYPES, result.type)) throw new Error('A análise retornou dados incompletos.');
     const { type, vision, mask, willieError, visionError } = result;
-    const maskUrl = mask
-      ? URL.createObjectURL(new Blob([Uint8Array.from(atob(mask), char => char.charCodeAt(0))], { type: 'image/png' }))
-      : null;
-    Object.assign(state, { type, vision, maskUrl, willieError, visionError, analyzed: true, maxStep: 1, pending: '' });
+    if (target !== 'gemini') {
+      const maskUrl = mask
+        ? URL.createObjectURL(new Blob([Uint8Array.from(atob(mask), char => char.charCodeAt(0))], { type: 'image/png' }))
+        : null;
+      if (state.maskUrl) URL.revokeObjectURL(state.maskUrl);
+      Object.assign(state, { type, maskUrl, willieError });
+    }
+    if (target !== 'willie') Object.assign(state, { vision, visionError, visualReview: {} });
+    Object.assign(state, { analyzed: true, report: null, maxStep: retry ? Math.min(state.maxStep, 2) : 1, pending: '' });
     goTo(1);
     announce('Análise concluída. Revise os achados.');
   } catch (error) {
@@ -246,6 +253,7 @@ document.addEventListener('click', event => {
       break;
     case 'gallery': el('gallery-file').click(); break;
     case 'analyze': void analyze(); break;
+    case 'retry-analysis': void analyze(true); break;
     case 'exam': goTo(2); break;
     case 'close': el('dialog').close(); break;
     case 'reset':
