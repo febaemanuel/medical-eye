@@ -115,10 +115,11 @@ function findingsScreen(state) {
         ${vision ? `<h3 class="image-cue">Achados sugeridos pelo Gemini</h3>
           ${vision.findings.length ? `<ul>${vision.findings.map(id => `<li>${esc(VISUAL[id])}</li>`).join('')}</ul>`
             : `<p>${esc(vision.description)}</p>`}` : ''}
-        ${!state.maskUrl && !state.willieError ? '<p class="quiet">Sem contorno identificado nesta foto.</p>' : ''}
+        ${state.type && !state.maskUrl && !state.willieError ? '<p class="quiet">Sem contorno identificado nesta foto.</p>' : ''}
       </div>
     </div>
     ${state.willieError ? notice(state.willieError, 'warning') : ''}
+    ${state.type === null && !state.willieError ? notice('As previsões do WILLIE divergiram. O exame começa pelo roteiro geral.') : ''}
     ${state.visionError ? notice(state.visionError + ' Você pode seguir com o exame.', 'warning') : ''}
     ${state.error ? notice(state.error, 'danger') : ''}
     ${vision?.quality === 'poor' ? notice('Considere tirar outra foto. A leitura do WILLIE também deve ser revisada.', 'warning') : ''}

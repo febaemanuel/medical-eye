@@ -99,6 +99,7 @@ test('uma chamada analisa o JPEG e as referências e o resumo são produzidos lo
   const requests = [];
   let result = { type: 'venous', ...vision };
   let willieStatus = 200;
+  let willieClass = 'diabetic';
   let geminiStatus = 200;
   const mask = 'iVBORw0KGgoAAAA=';
   const localCalls = [];
@@ -107,7 +108,7 @@ test('uma chamada analisa o JPEG e as referências e o resumo são produzidos lo
     for await (const chunk of request) chunks.push(chunk);
     localCalls.push({ path: request.url, body: Buffer.concat(chunks) });
     response.writeHead(willieStatus, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ class: 'diabetic', mask }));
+    response.end(JSON.stringify({ class: willieClass, mask }));
   });
   const willieUrl = await listen(willie);
   t.after(() => willie.close());
@@ -196,6 +197,16 @@ test('uma chamada analisa o JPEG e as referências e o resumo são produzidos lo
   assert.match(geminiRetry.visionError, /HTTP 503.*temporariamente/);
   assert.equal(localCalls.length, willieCount + 1);
   assert.equal(requests.length, cloudCount + 1);
+
+  willieClass = null;
+  geminiStatus = 200;
+  const undecided = await (await analyze(authorization)).json();
+  assert.equal(undecided.type, null);
+  assert.equal(undecided.mask, null);
+  assert.equal(undecided.willieError, null);
+  assert.ok(undecided.vision);
+  const view = renderView({ ...undecided, page: 'assessment', step: 1, maxStep: 1 });
+  assert.match(view, /previsões do WILLIE divergiram/);
 });
 
 test('PWA serve o manifesto e todo o shell atualizado com a busca local', async t => {

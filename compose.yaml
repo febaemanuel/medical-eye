@@ -32,6 +32,7 @@ services:
     build: ./willie
     restart: unless-stopped
     environment:
+      WILLIE_FOLDS: ${WILLIE_FOLDS:-5}
       WILLIE_THREADS: ${WILLIE_THREADS:-4}
       WILLIE_TOKEN: ${WILLIE_TOKEN:-}
     volumes:

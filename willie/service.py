@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 from io import BytesIO
+import logging
 import os
 from pathlib import Path
 from secrets import compare_digest
@@ -11,6 +12,7 @@ from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
 from model import WillieModel
+from scripts.fetch_models import checkpoints_for
 
 MAX_BYTES = 4 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = 16_000_000
@@ -19,9 +21,10 @@ Image.MAX_IMAGE_PIXELS = 16_000_000
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     directory = Path(os.environ.get("WILLIE_MODEL_DIR", ".cache/willie"))
-    checkpoint = Path(os.environ.get("WILLIE_CHECKPOINT", directory / "willie_mini_fold0_best.pt"))
+    checkpoints = [path for path, _ in checkpoints_for(directory)]
     backbone = Path(os.environ.get("WILLIE_BACKBONE_DIR", directory / "dinov2"))
-    app.state.model = WillieModel(checkpoint, backbone)
+    app.state.model = WillieModel(checkpoints, backbone)
+    logging.getLogger("uvicorn.error").info("WILLIE MINI pronto com %d checkpoint(s).", len(checkpoints))
     yield
 
 

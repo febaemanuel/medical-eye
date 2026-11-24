@@ -16,7 +16,9 @@ flowchart TD
 
 ## Foto
 
-O WILLIE usa um checkpoint oficial do MINI com os decodificadores de classificação e segmentação. A estimativa de contorno usa a máscara do modelo e pode ser ocultada na tela. As classes são `diabetic`, `pressure`, `surgical`, `venous` e `no_wound`. O Gemini recebe um esquema JSON para achados visuais, qualidade e descrição da foto. Uma falha em um provedor deixa os resultados do outro acessíveis.
+O WILLIE roda os cinco checkpoints oficiais do MINI por padrão. O tipo sugerido é o primeiro colocado na média das pontuações internas, desde que também seja o primeiro em pelo menos três dos cinco checkpoints. Em caso de divergência, o app exibe **Tipo indeterminado** e abre o roteiro geral. A concordância é uma regra de decisão e requer avaliação nas fotos do serviço para medir sua precisão. O contorno usa a máscara do primeiro checkpoint e pode ser ocultado na tela.
+
+As classes do WILLIE são `diabetic`, `pressure`, `surgical`, `venous` e `no_wound`. O Gemini recebe um esquema JSON para achados visuais, qualidade e descrição da foto. Uma falha em um provedor deixa os resultados do outro acessíveis.
 
 ## Exame e resumo
 

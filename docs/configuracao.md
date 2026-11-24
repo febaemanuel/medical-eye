@@ -4,6 +4,8 @@
 
 A interface publica a porta `4310` no computador. O Compose sobe o WILLIE na rede interna e guarda os pesos no volume `willie-models`. O serviço `references` baixa os PDFs catalogados para `references/` e encerra após a tarefa. A saída `Exited (0)` indica que o download terminou.
 
+O WILLIE baixa cinco checkpoints por padrão, cerca de 2 GB no total. Os arquivos já presentes no volume são reaproveitados. O serviço fica disponível quando o log informa que os checkpoints foram carregados. Em um computador com menos recursos, ajuste `WILLIE_FOLDS=3` ou `WILLIE_FOLDS=1` no `.env` e rode `docker compose up -d willie`. Com três checkpoints, a maioria exige dois votos. O modo de um checkpoint reproduz a seleção de tipo da versão anterior.
+
 ```powershell
 docker compose logs willie references
 docker compose run --rm references
@@ -21,6 +23,7 @@ Com Node.js 22 ou superior, execute `npm run references` e `npm start`. Configur
 | `VISION_MODEL` | Identificador do Gemini para leitura visual. Padrão `gemini-3.8-flash` |
 | `GEMINI_BASE_URL` | Gateway com contrato Gemini REST, quando necessário |
 | `WILLIE_URL` | Endereço do serviço de inferência |
+| `WILLIE_FOLDS` | Quantidade de checkpoints MINI utilizados. Padrão `5`, também aceita `3` ou `1` |
 | `WILLIE_TOKEN` | Credencial opcional, compartilhada entre o servidor e o WILLIE |
 | `REFERENCES_DIR` | Pasta de PDFs locais. Padrão `references/` na raiz do projeto |
 | `PORT` | Porta do app. Padrão `4310` |

@@ -8,6 +8,7 @@ export class ApiError extends Error {
 }
 
 export const DEFAULT_MODEL = 'gemini-3.8-flash';
+const WILLIE_TIMEOUT_SECONDS = 90;
 
 function networkCode(error) {
   if (error?.name === 'TimeoutError') return 'TIMEOUT';
@@ -114,12 +115,13 @@ export async function analyzeWithWillie(image, config) {
   try {
     const url = new URL('/classify', config.WILLIE_URL || 'http://127.0.0.1:8765');
     response = await fetch(url, {
-      method: 'POST', headers, body: image, redirect: 'error', signal: AbortSignal.timeout(30000),
+      method: 'POST', headers, body: image, redirect: 'error',
+      signal: AbortSignal.timeout(WILLIE_TIMEOUT_SECONDS * 1000),
     });
   } catch (error) {
     const code = networkCode(error);
     throw providerError('willie', code, code === 'TIMEOUT'
-      ? 'O WILLIE passou de 30 segundos de processamento. Você pode tentar novamente.'
+      ? `O WILLIE passou de ${WILLIE_TIMEOUT_SECONDS} segundos de processamento. Você pode tentar novamente.`
       : `O servidor não conseguiu conectar ao WILLIE (${code}).`);
   }
 
@@ -133,8 +135,10 @@ export async function analyzeWithWillie(image, config) {
 
   try {
     const result = await response.json();
-    if (typeof result.class !== 'string' || !Object.hasOwn(TYPES, result.class)) throw new Error('Classe inválida');
-    const mask = result.class !== 'no_wound' && typeof result.mask === 'string' && result.mask.length <= 100000 &&
+    if (result.class !== null && (typeof result.class !== 'string' || !Object.hasOwn(TYPES, result.class))) {
+      throw new Error('Classe inválida');
+    }
+    const mask = result.class && result.class !== 'no_wound' && typeof result.mask === 'string' && result.mask.length <= 100000 &&
       /^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(result.mask) ? result.mask : null;
     return { type: result.class, mask };
   } catch {
